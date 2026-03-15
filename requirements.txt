@@ -1,0 +1,9 @@
+httpx>=0.25.0
+fastmcp>=3.0.0
+typer>=0.9.0
+arrow>=1.3.0
+darkdetect>=0.8.0
+rich>=13.7.0
+Pillow>=10.0.0
+textual-image>=0.2.0
+typing-extensions>=4.15.0

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.ejfkdev/zread",
+  "description": "Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 zread.ai，AI 驱动的 GitHub 项目文档。",
+  "repository": {
+    "url": "https://github.com/ejfkdev/zread",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "zread",
+      "runtimeArguments": [
+        "mcp"
+      ],
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "description": "zread.ai网站账号JWT token",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": true,
+          "name": "ZREAD_TOKEN"
+        },
+        {
+          "description": "配置文档首选语言，zh或en",
+          "isRequired": false,
+          "format": "string",
+          "isSecret": false,
+          "name": "ZREAD_LANG"
+        }
+      ]
+    }
+  ]
+}
