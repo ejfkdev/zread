@@ -1,8 +1,16 @@
 # Zread - AI 代码仓库阅读助手
 
+中文 | [English](README.en.md)
+
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![Version](https://img.shields.io/badge/Version-2.0.2-0A7B83)](https://pypi.org/project/zread/)
+[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/ejfkdev/zread)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-green)](https://modelcontextprotocol.io/)
+[![CLI](https://img.shields.io/badge/Interface-CLI-2E8B57)](https://pypi.org/project/zread/)
+[![Transport](https://img.shields.io/badge/Transport-stdio%20%7C%20http%20%7C%20sse-6A5ACD)](https://github.com/ejfkdev/zread)
+[![I18N](https://img.shields.io/badge/I18N-zh%20%7C%20en-FF8C00)](https://github.com/ejfkdev/zread)
 [![PyPI](https://img.shields.io/badge/PyPI-zread-blue)](https://pypi.org/project/zread/)
+[![Downloads](https://img.shields.io/pypi/dm/zread)](https://pypi.org/project/zread/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 [Zread.ai](https://zread.ai)，AI 驱动的 GitHub 项目文档。
@@ -186,7 +194,7 @@ zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
 
 | 选项                 | 说明                                                           |
 | -------------------- | -------------------------------------------------------------- |
-| `-l, --lang {zh,en}` | 语言（默认：先读 `ZREAD_LANG`，再读 `$LANG`，都没有则为 `zh`） |
+| `-l, --lang {zh,en}` | 语言（优先级：`--lang` > `ZREAD_LANG` > PyLocale，默认 `en`） |
 | `-j, --json`         | JSON 格式输出                                                  |
 | `-p, --plain`        | 纯文本输出                                                     |
 | `-t, --token`        | ZREAD_TOKEN                                                    |
@@ -285,7 +293,7 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 | 变量          | 说明                                                          |
 | ------------- | ------------------------------------------------------------- |
 | `ZREAD_TOKEN` | zread.ai 登录账号的免费 JWT Token，仅 AI 问答功能需要         |
-| `ZREAD_LANG`  | 默认语言 (zh/en)，优先级高于 `LANG`                           |
+| `ZREAD_LANG`  | 默认语言 (`zh` / `en`)，优先级低于 `--lang`，高于 PyLocale   |
 
 ## 贡献
 

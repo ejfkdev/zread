@@ -8,6 +8,8 @@
 #   "typer>=0.9.0",
 #   "arrow>=1.3.0",
 #   "darkdetect>=0.8.0",
+#   "python-i18n>=0.3.9",
+#   "pylocale>=0.0.1",
 #   "rich>=13.7.0",
 #   "Pillow>=10.0.0",
 #   "textual-image>=0.2.0",
@@ -21,6 +23,7 @@
 import asyncio
 import json
 import logging
+import locale
 import os
 import re
 import sys
@@ -43,7 +46,9 @@ import darkdetect
 
 # 第三方库
 import httpx as _httpx
+import i18n
 import typer
+from pylocale import PyLocale
 from rich.box import SIMPLE_HEAD
 
 # Rich 用于 Markdown 渲染
@@ -92,7 +97,7 @@ _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", "")
 # 固定域名
 BASE_URL = "https://zread.ai"
 APP_NAME = "zread"
-APP_VERSION = "2.0.1"
+APP_VERSION = "2.0.2"
 
 # User-Agent
 USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/efjdkev/zread)"
@@ -101,6 +106,9 @@ USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://githu
 DEFAULT_HEADERS = {
     "User-Agent": USER_AGENT,
 }
+
+LOCALES_DIR = Path(__file__).resolve().parent / "locales"
+PYLOCALE_DIR = Path(__file__).resolve().parent / "pylocale"
 
 # Markdown 链接正则（slug 转链接）
 SLUG_LINK_PATTERN = re.compile(
@@ -142,7 +150,7 @@ def _retry_sync_request(request_fn: Callable[[], Any]) -> Any:
                     raise
     if last_error:
         raise last_error
-    raise RuntimeError("HTTP 请求失败")
+    raise RuntimeError(tr("errors.http_request_failed"))
 
 
 async def _retry_async_request(request_fn: Callable[[], Any]) -> Any:
@@ -162,7 +170,7 @@ async def _retry_async_request(request_fn: Callable[[], Any]) -> Any:
                     raise
     if last_error:
         raise last_error
-    raise RuntimeError("HTTP 请求失败")
+    raise RuntimeError(tr("errors.http_request_failed"))
 
 
 def _raise_for_retryable_status(response: _httpx.Response) -> None:
@@ -482,7 +490,7 @@ def _format_repo_items_plain(
             else item.get("description", "")
         )
         if not desc:
-            desc = item.get("description", "无描述")
+            desc = item.get("description", tr("messages.no_description", lang))
         desc = desc.replace("\n", " ")
 
         # 第一行：URL + 星标
@@ -713,7 +721,7 @@ def _format_status_plain(item: Dict, lang: str) -> str:
         item.get("description_zh", "") if lang == "zh" else item.get("description", "")
     )
     if not desc:
-        desc = item.get("description", "无描述")
+        desc = item.get("description", tr("messages.no_description", lang))
     desc = desc.replace("\n", " ")
 
     lines = [
@@ -733,7 +741,7 @@ def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
     lines = []
     pages = data.get("pages", [])
     if not pages:
-        return "(暂无页面)"
+        return tr("messages.no_pages")
 
     # 按组分组
     groups: Dict[str, Any] = {}
@@ -795,7 +803,7 @@ def _format_outline_rich(data: Dict, owner: str, repo_name: str) -> None:
     """Rich 格式输出大纲（使用 Tree 组件）"""
     pages = data.get("pages", [])
     if not pages:
-        typer.echo("(暂无页面)")
+        typer.echo(tr("messages.no_pages"))
         return
 
     console = Console()
@@ -975,29 +983,98 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
         if content_text:
             console.print(content_text)
         else:
-            console.print("[dim]无预览内容[/dim]")
+            console.print(f"[dim]{tr('messages.no_preview')}[/dim]")
 
         console.print()
 
 
 def _get_default_lang() -> str:
-    """获取默认语言，优先级：ZREAD_LANG > LANG 环境变量 > zh。"""
+    """获取默认语言，优先级：CLI --lang > ZREAD_LANG > PyLocale > en。"""
+    argv = sys.argv[1:]
+    for idx, arg in enumerate(argv):
+        if arg.startswith("--lang="):
+            cli_lang = arg.split("=", 1)[1]
+            if cli_lang in ("zh", "en"):
+                return cli_lang
+        if arg in ("--lang", "-l") and idx + 1 < len(argv):
+            cli_lang = argv[idx + 1]
+            if cli_lang in ("zh", "en"):
+                return cli_lang
+
     zread_lang = os.environ.get("ZREAD_LANG", "")
     if zread_lang in ("zh", "en"):
         return zread_lang
 
-    # 检查系统 LANG 环境变量 (如 zh_CN.UTF-8 -> zh, en_US.UTF-8 -> en)
-    sys_lang = os.environ.get("LANG", "")
-    if sys_lang.startswith("zh"):
-        return "zh"
-    elif sys_lang.startswith("en"):
+    return _detect_lang_with_pylocale()
+
+
+def _normalize_lang_code(raw_lang: Optional[str]) -> str:
+    if not raw_lang:
         return "en"
-    # 默认中文
-    return "zh"
+    normalized = raw_lang.replace("-", "_").lower()
+    if normalized.startswith("zh"):
+        return "zh"
+    if normalized.startswith("en"):
+        return "en"
+    return "en"
+
+
+def _detect_lang_with_pylocale() -> str:
+    """使用 PyLocale 根据系统 locale 在受支持语言中做归一化判定。"""
+    candidates: List[str] = []
+
+    try:
+        current_locale, _ = locale.getlocale()
+        if current_locale:
+            candidates.append(current_locale)
+    except Exception:
+        pass
+
+    for env_name in ("LC_ALL", "LC_MESSAGES", "LANG"):
+        env_value = os.environ.get(env_name, "")
+        if env_value:
+            candidates.append(env_value)
+
+    for raw_lang in candidates:
+        lang = _normalize_lang_code(raw_lang.split(".", 1)[0])
+        try:
+            detector = PyLocale(at=str(PYLOCALE_DIR), root="en", silent=True)
+            detector.switch(lang)
+            detected = detector["lang"].strip()
+            if detected in ("zh", "en"):
+                return detected
+        except Exception:
+            continue
+
+    return "en"
 
 
 # 全局默认语言，可通过 set_default_lang() 修改
 _DEFAULT_LANG: str = _get_default_lang()
+
+
+def _configure_i18n(lang: str) -> None:
+    """初始化 i18n 配置。"""
+    locale_path = str(LOCALES_DIR)
+    if locale_path not in i18n.load_path:
+        i18n.load_path.append(locale_path)
+    i18n.set("file_format", "yml")
+    i18n.set("filename_format", "{namespace}.{locale}.{format}")
+    i18n.set("fallback", "zh")
+    i18n.set("locale", lang)
+
+
+def tr(key: str, lang: Optional[str] = None, **kwargs: Any) -> str:
+    """读取翻译文本。"""
+    locale = lang if lang in ("zh", "en") else _DEFAULT_LANG
+    return i18n.t(f"messages.{key}", locale=locale, default=key, **kwargs)
+
+
+_configure_i18n(_DEFAULT_LANG)
+
+
+def _unknown_error(lang: Optional[str] = None) -> str:
+    return tr("messages.unknown_error", lang)
 
 
 def set_default_lang(lang: str) -> None:
@@ -1005,6 +1082,7 @@ def set_default_lang(lang: str) -> None:
     global _DEFAULT_LANG
     if lang in ("zh", "en"):
         _DEFAULT_LANG = lang
+        i18n.set("locale", lang)
 
 
 def _resolve_lang(lang: Optional[str]) -> str:
@@ -1057,13 +1135,15 @@ def _http_get(
         if result.get("code") == 0:
             return result.get("data")
         else:
-            print(f"{error_msg}: {result.get('msg', '未知错误')}")
+            print(f"{error_msg}: {result.get('msg', _unknown_error(lang))}")
             return None
     except httpx.RequestError as e:
-        print(f"{error_msg} - 网络错误: {e}")
+        print(tr("errors.network_error_with_context", lang, context=error_msg, error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"{error_msg} - JSON解析错误: {e}")
+        print(
+            tr("errors.json_parse_error_with_context", lang, context=error_msg, error=e)
+        )
         return None
 
 
@@ -1289,10 +1369,10 @@ def fetch_repo_outline(
         return simplified_pages
 
     except json.JSONDecodeError as e:
-        print(f"解析 JSON 失败: {e}")
+        print(tr("errors.parse_json_failed", error=e))
         return None
     except (KeyError, TypeError) as e:
-        print(f"解析数据结构失败: {e}")
+        print(tr("errors.parse_data_structure_failed", error=e))
         return None
 
 
@@ -1397,10 +1477,10 @@ def search_wiki(repo_url_or_path: str, query: str, lang: str = "zh") -> str:
         return "\n\n".join(formatted_results) if formatted_results else "no result"
 
     except httpx.RequestError as e:
-        print(f"搜索 Wiki 网络请求失败: {e}")
+        print(tr("errors.search_wiki_network_failed", lang, error=e))
         return "no result"
     except json.JSONDecodeError as e:
-        print(f"搜索 Wiki 响应解析失败: {e}")
+        print(tr("errors.search_wiki_parse_failed", lang, error=e))
         return "no result"
 
 
@@ -1428,13 +1508,19 @@ def create_talk(token: Optional[str] = None, lang: str = "zh") -> Optional[str]:
         if result.get("code") == 0 and result.get("data"):
             return result["data"].get("talk_id")
         else:
-            print(f"创建对话失败: {result.get('msg', '未知错误')}")
+            print(
+                tr(
+                    "errors.create_talk_failed_with_reason",
+                    lang,
+                    detail=result.get("msg", _unknown_error(lang)),
+                )
+            )
             return None
     except httpx.RequestError as e:
-        print(f"创建对话网络请求失败: {e}")
+        print(tr("errors.create_talk_network_failed", lang, error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"创建对话响应解析失败: {e}")
+        print(tr("errors.create_talk_parse_failed", lang, error=e))
         return None
 
 
@@ -1532,7 +1618,9 @@ async def send_message_async(
                                 # API 返回错误
                                 yield {
                                     "event": "error",
-                                    "text": event_data.get("text", "未知错误"),
+                                    "text": event_data.get(
+                                        "text", _unknown_error(lang)
+                                    ),
                                     "reasoning_content": "",
                                 }
                                 return
@@ -1540,7 +1628,7 @@ async def send_message_async(
                             continue
 
     except Exception as e:
-        error_msg = f"异步发送消息失败: {e}"
+        error_msg = tr("errors.send_message_async_failed", lang, error=e)
         print(error_msg)
         yield {"event": "error", "text": error_msg, "reasoning_content": ""}
 
@@ -1581,7 +1669,9 @@ async def send_repo_message_async(
         if error_message:
             yield {
                 "event": "error",
-                "text": error_message.replace("错误: ", "", 1),
+                "text": error_message.replace(
+                    tr("errors.error_prefix", lang) + " ", "", 1
+                ),
                 "reasoning_content": "",
             }
             return
@@ -1612,7 +1702,7 @@ def _collect_ai_chunk(
 
     event_type = chunk.get("event")
     if event_type == "error":
-        return chunk.get("text", "未知错误")
+        return chunk.get("text", _unknown_error(_DEFAULT_LANG))
 
     if event_type == "answer" or (
         include_round_finish and event_type == "round_finish"
@@ -1654,16 +1744,16 @@ def _get_repo_ai_context(
         return None, None, None, unavailable_message
 
     if not metadata:
-        return None, None, None, "错误: 无法获取仓库状态"
+        return None, None, None, tr("errors.fetch_repo_status", lang)
 
     wiki_id = metadata.get("wiki_id")
     repo_id = metadata.get("repo_id")
     if not wiki_id:
-        return None, None, None, "错误: 仓库缺少可用文档索引，暂时无法进行 AI 对话"
+        return None, None, None, tr("errors.repo_missing_docs", lang)
 
     outline = fetch_repo_outline(repo_path, lang=lang)
     if not outline:
-        return None, None, None, "错误: 仓库没有页面"
+        return None, None, None, tr("errors.repo_has_no_pages", lang)
 
     page_id = outline[0].get("page_id", "")
     return wiki_id, page_id, repo_id, None
@@ -1844,13 +1934,19 @@ def recommend_repos(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any
         if result.get("code") == 0:
             return result.get("data")
         else:
-            print(f"推荐仓库失败: {result.get('msg', '未知错误')}")
+            print(
+                tr(
+                    "errors.recommend_failed_with_reason",
+                    lang,
+                    detail=result.get("msg", _unknown_error(lang)),
+                )
+            )
             return None
     except httpx.RequestError as e:
-        print(f"推荐仓库网络请求失败: {e}")
+        print(tr("errors.recommend_network_failed", lang, error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"推荐仓库响应解析失败: {e}")
+        print(tr("errors.recommend_parse_failed", lang, error=e))
         return None
 
 
@@ -1872,13 +1968,19 @@ def search_repos(query: str, lang: str = "zh") -> Optional[List[Dict[str, Any]]]
         if result.get("code") == 0:
             return result.get("data", [])
         else:
-            print(f"搜索仓库失败: {result.get('msg', '未知错误')}")
+            print(
+                tr(
+                    "errors.search_repo_failed_with_reason",
+                    lang,
+                    detail=result.get("msg", _unknown_error(lang)),
+                )
+            )
             return None
     except httpx.RequestError as e:
-        print(f"搜索仓库网络请求失败: {e}")
+        print(tr("errors.search_repo_network_failed", lang, error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"搜索仓库响应解析失败: {e}")
+        print(tr("errors.search_repo_parse_failed", lang, error=e))
         return None
 
 
@@ -1918,7 +2020,7 @@ def get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, An
     """
     # 解析 owner/repo 格式
     if "/" not in owner_or_path:
-        raise ValueError("请使用 owner/repo 格式，例如: openclaw/openclaw")
+        raise ValueError(tr("errors.invalid_repo_format"))
 
     parts = owner_or_path.split("/")
     owner = parts[0]
@@ -1935,13 +2037,19 @@ def get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, An
         if result.get("code") == 0:
             return result.get("data")
         else:
-            print(f"获取仓库信息失败: {result.get('msg', '未知错误')}")
+            print(
+                tr(
+                    "errors.get_repo_info_failed_with_reason",
+                    lang,
+                    detail=result.get("msg", _unknown_error(lang)),
+                )
+            )
             return None
     except httpx.RequestError as e:
-        print(f"获取仓库信息网络请求失败: {e}")
+        print(tr("errors.get_repo_info_network_failed", lang, error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"获取仓库信息响应解析失败: {e}")
+        print(tr("errors.get_repo_info_parse_failed", lang, error=e))
         return None
 
 
@@ -1967,13 +2075,18 @@ def submit_repo(
         if result.get("code") == 0:
             return result.get("data")
         else:
-            print(f"提交索引失败: {result.get('msg', '未知错误')}")
+            print(
+                tr(
+                    "errors.submit_repo_failed_with_reason",
+                    detail=result.get("msg", _unknown_error()),
+                )
+            )
             return None
     except httpx.RequestError as e:
-        print(f"提交索引网络请求失败: {e}")
+        print(tr("errors.submit_repo_network_failed", error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"提交索引响应解析失败: {e}")
+        print(tr("errors.submit_repo_parse_failed", error=e))
         return None
 
 
@@ -1992,7 +2105,7 @@ def refresh_repo(repo_id: str, token: Optional[str] = None) -> bool:
         response = httpx.post(url, headers=headers, timeout=30)
         return response.status_code < 300
     except httpx.RequestError as e:
-        print(f"刷新索引网络请求失败: {e}")
+        print(tr("errors.refresh_repo_network_failed", error=e))
         return False
 
 
@@ -2013,12 +2126,12 @@ def fetch_repo_files_with_meta(
     owner, repo = parsed["owner"], parsed["repo"]
     repo_info = get_repo_info(f"{owner}/{repo}")
     if not repo_info:
-        print(f"无法获取仓库信息: {repo_path}")
+        print(tr("errors.fetch_repo_info_for_file_failed", repo=repo_path))
         return None
 
     repo_id = repo_info.get("repo_id")
     if not repo_id:
-        print("仓库信息中缺少 repo_id")
+        print(tr("errors.repo_info_missing_repo_id"))
         return None
 
     token = _get_token(token, required=False)
@@ -2042,12 +2155,17 @@ def fetch_repo_files_with_meta(
         result = response.json()
 
         if result.get("code") != 0:
-            print(f"获取文件失败: {result.get('msg', '未知错误')}")
+            print(
+                tr(
+                    "errors.fetch_file_failed_with_reason",
+                    detail=result.get("msg", _unknown_error()),
+                )
+            )
             return None
 
         files_data = result.get("data", [])
         if not files_data:
-            print("文件不存在或无法访问")
+            print(tr("errors.file_not_found_or_inaccessible"))
             return None
 
         file_info = files_data[0]
@@ -2121,13 +2239,13 @@ def fetch_repo_files_with_meta(
         }
 
     except httpx.RequestError as e:
-        print(f"获取文件内容网络请求失败: {e}")
+        print(tr("errors.fetch_file_network_failed", error=e))
         return None
     except json.JSONDecodeError as e:
-        print(f"获取文件内容响应解析失败: {e}")
+        print(tr("errors.fetch_file_parse_failed", error=e))
         return None
     except (KeyError, IndexError) as e:
-        print(f"获取文件内容数据解析失败: {e}")
+        print(tr("errors.fetch_file_data_parse_failed", error=e))
         return None
 
 
@@ -2366,18 +2484,20 @@ def _chat_with_repo_ai(
     """
     wiki_id, page_id, repo_id, error_message = _get_repo_ai_context(repo_path, lang)
     if error_message:
-        return f"❌ {error_message.replace('错误: ', '', 1)}"
+        return (
+            f"❌ {error_message.replace(tr('errors.error_prefix', lang) + ' ', '', 1)}"
+        )
 
     # 获取 token
     try:
         token = _get_token()
     except ValueError:
-        return "🔑 请先设置 ZREAD_TOKEN 环境变量以使用 AI 对话功能"
+        return tr("messages.set_token_for_ai", lang)
 
     # 创建会话
     talk_id = create_talk(token=token, lang=lang)
     if not talk_id:
-        return "❌ AI 会话创建失败"
+        return tr("errors.ai_session_create_failed", lang)
 
     try:
         # 发送消息
@@ -2391,7 +2511,7 @@ def _chat_with_repo_ai(
             model=model,
             lang=lang,
         )
-        return answer if answer else "🤖 AI 未返回有效回复"
+        return answer if answer else tr("messages.ai_no_valid_reply", lang)
     finally:
         # 清理会话
         try:
@@ -2409,10 +2529,10 @@ def _fetch_repo_outline(repo_path: str, lang: str = "zh") -> str:
     # 获取仓库元数据（内部会处理索引提交和刷新）
     data = fetch_repo_metadata(repo_path)
     if not data:
-        return "❌ 无法获取仓库信息，请稍后重试"
+        return tr("errors.fetch_repo_info_retry", lang)
     unavailable_message = _get_ai_unavailable_message(repo_path, data)
     if unavailable_message:
-        return f"❌ {unavailable_message.replace('错误: ', '', 1)}"
+        return f"❌ {unavailable_message.replace(tr('errors.error_prefix', lang) + ' ', '', 1)}"
 
     repo_id = data.get("repo_id")
     wiki_id = data.get("wiki_id")
@@ -2420,7 +2540,7 @@ def _fetch_repo_outline(repo_path: str, lang: str = "zh") -> str:
     # 获取目录
     outline = fetch_repo_outline(repo_path, lang=lang)
     if not outline:
-        return "❌ 获取仓库目录失败"
+        return tr("errors.fetch_repo_outline_failed", lang)
 
     # 解析仓库路径
     parsed = parse_repo_url(repo_path)
@@ -2464,7 +2584,7 @@ def read_page(repo: str, slug: str) -> str:
     result = fetch_markdown(repo, slug, lang=_DEFAULT_LANG)
     if result:
         return result
-    return f"❌ 无法获取页面内容: {slug}"
+    return tr("errors.fetch_page_for_slug_failed", slug=slug)
 
 
 def search_docs(repo: str, query: str) -> str:
@@ -2570,7 +2690,7 @@ def discover(topic: str = "") -> str:
         if repos:
             lines.append(_format_repo_list_plain(repos, _DEFAULT_LANG))
         return "\n".join(lines).strip()
-    return "❌ 获取推荐仓库失败"
+    return tr("errors.fetch_recommend_repo_failed")
 
 
 def find(query: str) -> str:
@@ -2592,7 +2712,7 @@ def find(query: str) -> str:
     result = search_repos(query, lang=_DEFAULT_LANG)
     if result:
         return _format_repo_list_plain(result, _DEFAULT_LANG)
-    return "❌ 搜索仓库失败"
+    return tr("errors.search_repo_failed")
 
 
 def trending(weeks: int = 1) -> str:
@@ -2613,7 +2733,7 @@ def trending(weeks: int = 1) -> str:
     result = get_trending_repos(lang=_DEFAULT_LANG)
     if result:
         return _format_trending_plain(result[:weeks], _DEFAULT_LANG)
-    return "❌ 获取热门仓库失败"
+    return tr("errors.fetch_trending_repo_failed")
 
 
 def info(repo: str) -> str:
@@ -2638,7 +2758,7 @@ def info(repo: str) -> str:
     result = get_repo_info(repo, lang=_DEFAULT_LANG)
     if result:
         return _format_status_plain(result, _DEFAULT_LANG)
-    return "❌ 获取仓库信息失败"
+    return tr("errors.fetch_repo_info_failed")
 
 
 def read_file(
@@ -2672,7 +2792,7 @@ def read_file(
         end_line=end_line,
     )
     if content is None:
-        return f"❌ 无法获取文件: {path}"
+        return tr("errors.fetch_file_failed_for_path", path=path)
     return content
 
 
@@ -2870,7 +2990,7 @@ def _get_mcp(has_token: bool) -> Any:
 
 # 创建 Typer CLI app
 cli_app = typer.Typer(
-    help="Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。",
+    help=tr("cli.app_help"),
     add_completion=False,
     rich_markup_mode="rich",
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -2892,14 +3012,12 @@ def _print_help_with_env(ctx: typer.Context) -> None:
     # 添加环境变量面板
     console = Console()
     env_table = Table(show_header=False, box=None, padding=(0, 2))
-    env_table.add_row(
-        "[green]ZREAD_TOKEN[/green]", "zread.ai登录账号的JWT token，仅AI问答功能需要"
-    )
-    env_table.add_row("[green]ZREAD_LANG[/green]", "默认语言(zh/en)，优先级高于 LANG")
+    env_table.add_row("[green]ZREAD_TOKEN[/green]", tr("cli.env_var_token_desc"))
+    env_table.add_row("[green]ZREAD_LANG[/green]", tr("cli.env_var_lang_desc"))
 
     env_panel = Panel(
         env_table,
-        title="[bold cyan]环境变量[/bold cyan]",
+        title=f"[bold cyan]{tr('cli.env_vars_title')}[/bold cyan]",
         border_style="blue",
         padding=(1, 2),
     )
@@ -2910,11 +3028,19 @@ def _print_help_with_env(ctx: typer.Context) -> None:
 def cli_callback(
     ctx: typer.Context,
     version: Annotated[
-        bool, typer.Option("-v", "--version", help="显示版本号")
+        bool, typer.Option("-v", "--version", help=tr("cli.show_version"))
     ] = False,
-    help: Annotated[bool, typer.Option("-h", "--help", help="显示帮助信息")] = False,
+    lang: Annotated[
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
+    ] = None,
+    help: Annotated[
+        bool, typer.Option("-h", "--help", help=tr("cli.show_help"))
+    ] = False,
 ) -> None:
     """CLI 回调函数，无子命令时显示帮助"""
+    if lang:
+        set_default_lang(lang)
+
     if version:
         typer.echo(f"{APP_NAME} {APP_VERSION}")
         raise typer.Exit(0)
@@ -2982,22 +3108,18 @@ def _run_with_cli_status(
         status.stop()
 
 
-@cli_app.command(name="mcp")
+@cli_app.command(name="mcp", help=tr("cli.commands.mcp"))
 def cmd_mcp(
-    transport: Annotated[
-        str, typer.Argument(help="传输协议: stdio/sse/http")
-    ] = "stdio",
+    transport: Annotated[str, typer.Argument(help=tr("cli.args.transport"))] = "stdio",
     address: Annotated[
         Optional[str],
-        typer.Argument(
-            help="地址，支持: host, host:port, :port, host:port/path, :port/path (默认: 127.0.0.1:8708)"
-        ),
+        typer.Argument(help=tr("cli.args.address")),
     ] = None,
     token: Annotated[
-        Optional[str], typer.Option("--token", "-t", help="ZREAD_TOKEN")
+        Optional[str], typer.Option("--token", "-t", help=tr("cli.options.token"))
     ] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言: zh/en")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
 ) -> None:
     """启动 MCP 服务器
@@ -3023,20 +3145,18 @@ def cmd_mcp(
     _run_mcp_server(transport, host, port, path, token)
 
 
-@cli_app.command(name="ls")
+@cli_app.command(name="ls", help=tr("cli.commands.ls"))
 def cmd_get_outline(
     ctx: typer.Context,
-    repo: Annotated[
-        Optional[str], typer.Argument(help="仓库路径，格式: owner/repo")
-    ] = None,
+    repo: Annotated[Optional[str], typer.Argument(help=tr("cli.args.repo"))] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="JSON 格式输出")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.json"))
     ] = False,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="输出纯文本内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = False,
 ) -> None:
     """获取文档目录结构
@@ -3048,19 +3168,19 @@ def cmd_get_outline(
     """
     if not repo:
         typer.echo(ctx.get_help())
-        typer.echo("\n❌ 缺少必选参数: REPO (仓库路径，格式: owner/repo)", err=True)
+        typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
     lang = _resolve_lang(lang)
 
     outline = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在获取文档目录...[/dim]",
+        f"[dim]{tr('status.fetch_outline', lang)}[/dim]",
         fetch_repo_outline,
         repo,
         lang=lang,
     )
     if not outline:
-        typer.echo("错误: 无法获取文档目录", err=True)
+        typer.echo(tr("errors.fetch_outline", lang), err=True)
         raise typer.Exit(1)
 
     # 解析仓库路径
@@ -3082,33 +3202,30 @@ ZREAD_SLUG_PATTERN = re.compile(r"^(?:\d+|\d+-[a-z][a-z-]*)$")
 
 @cli_app.command(
     name="cat",
+    help=tr("cli.commands.cat"),
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
 def cmd_cat(
     ctx: typer.Context,
     repo_or_url: Annotated[
-        Optional[str], typer.Argument(help="仓库路径(owner/repo) 或 GitHub URL")
+        Optional[str], typer.Argument(help=tr("cli.args.repo_or_url"))
     ] = None,
     path_or_slug: Annotated[
         Optional[str],
-        typer.Argument(
-            help="zread slug(如: 1-overview) 或 文件路径(如: README.md)，默认: 1-overview"
-        ),
+        typer.Argument(help=tr("cli.args.path_or_slug")),
     ] = None,
     arg3: Annotated[
         Optional[str],
-        typer.Argument(
-            help="可选: 文件路径、起始行号或行号范围(如: 5, 5:20, Lib/http/client.py)"
-        ),
+        typer.Argument(help=tr("cli.args.cat_extra")),
     ] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="JSON 格式输出")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.json"))
     ] = False,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="输出纯文本内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = False,
 ) -> None:
     """查看仓库内容（支持 zread 文档或 GitHub 文件）
@@ -3127,7 +3244,7 @@ def cmd_cat(
     """
     if not repo_or_url:
         typer.echo(ctx.get_help())
-        typer.echo("\n❌ 缺少必选参数: REPO_OR_URL (仓库路径或 GitHub URL)", err=True)
+        typer.echo(f"\n❌ {tr('errors.missing_repo_or_url')}", err=True)
         raise typer.Exit(1)
     lang = _resolve_lang(lang)
 
@@ -3281,29 +3398,33 @@ def _cat_zread_page(
     if slug.isdigit():
         pages = _run_with_cli_status(
             use_status,
-            "[dim]正在获取文档目录...[/dim]",
+            f"[dim]{tr('status.fetch_outline', lang)}[/dim]",
             fetch_repo_outline,
             repo,
             lang=lang,
         )
         if not pages:
-            typer.echo("错误: 无法获取仓库目录", err=True)
+            typer.echo(tr("errors.fetch_repo_outline", lang), err=True)
             raise typer.Exit(1)
 
         target_num = int(slug)
         if target_num < 1 or target_num > len(pages):
-            typer.echo(f"错误: 找不到序号 {target_num} 的页面", err=True)
+            typer.echo(
+                tr("errors.page_number_not_found", lang, number=target_num), err=True
+            )
             raise typer.Exit(1)
 
         page_info = pages[target_num - 1]
         actual_slug = page_info.get("slug") or ""
         if not actual_slug:
-            typer.echo(f"错误: 序号 {target_num} 对应页面缺少 slug", err=True)
+            typer.echo(
+                tr("errors.page_missing_slug", lang, number=target_num), err=True
+            )
             raise typer.Exit(1)
 
     content = _run_with_cli_status(
         use_status,
-        "[dim]正在获取页面内容...[/dim]",
+        f"[dim]{tr('status.fetch_page', lang)}[/dim]",
         fetch_markdown,
         repo,
         actual_slug,
@@ -3312,7 +3433,7 @@ def _cat_zread_page(
     if not content and slug == "1-overview":
         pages = pages or _run_with_cli_status(
             use_status,
-            "[dim]正在定位默认页面...[/dim]",
+            f"[dim]{tr('status.locate_default_page', lang)}[/dim]",
             fetch_repo_outline,
             repo,
             lang=lang,
@@ -3323,7 +3444,7 @@ def _cat_zread_page(
             if fallback_slug and fallback_slug != actual_slug:
                 fallback_content = _run_with_cli_status(
                     use_status,
-                    "[dim]正在获取页面内容...[/dim]",
+                    f"[dim]{tr('status.fetch_page', lang)}[/dim]",
                     fetch_markdown,
                     repo,
                     fallback_slug,
@@ -3335,7 +3456,7 @@ def _cat_zread_page(
                     content = fallback_content
 
     if not content:
-        typer.echo("错误: 无法获取页面内容", err=True)
+        typer.echo(tr("errors.fetch_page", lang), err=True)
         raise typer.Exit(1)
 
     # 构建页面标题路径（section / group / topic 或 title）
@@ -3560,11 +3681,18 @@ def _render_github_file_output(
     plain: bool,
 ) -> None:
     """统一渲染 GitHub 文件内容。"""
-    file_info = (
-        f"📄 {file_path} | 总行数: {total_lines} | 大小: {_format_size(total_size)}"
+    file_info = tr(
+        "messages.file_info",
+        file_path=file_path,
+        total_lines=total_lines,
+        size=_format_size(total_size),
     )
     if actual_start and actual_end and (actual_start > 1 or actual_end < total_lines):
-        file_info += f" | 显示: {actual_start}-{actual_end} 行"
+        file_info += tr(
+            "messages.file_info_showing_lines",
+            start=actual_start,
+            end=actual_end,
+        )
 
     if json_output:
         typer.echo(
@@ -3614,13 +3742,13 @@ def _cat_github_file_parsed(
 ) -> None:
     """读取 GitHub 文件内容（已解析参数）"""
     if not owner_repo or not file_path:
-        typer.echo("错误: 无法解析仓库路径和文件路径", err=True)
+        typer.echo(tr("errors.parse_repo_and_file_failed"), err=True)
         raise typer.Exit(1)
 
     # 获取文件内容及元数据
     file_meta = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在获取文件内容...[/dim]",
+        f"[dim]{tr('status.fetch_file_content')}[/dim]",
         fetch_repo_files_with_meta,
         owner_repo,
         file_path,
@@ -3628,7 +3756,7 @@ def _cat_github_file_parsed(
         end_line,
     )
     if not file_meta:
-        typer.echo("错误: 无法获取文件内容", err=True)
+        typer.echo(tr("errors.fetch_file_content"), err=True)
         raise typer.Exit(1)
 
     _render_github_file_output(
@@ -3666,22 +3794,23 @@ def _cat_github_file(
 
 @cli_app.command(
     name="find",
+    help=tr("cli.commands.find"),
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
 def cmd_find(
     ctx: typer.Context,
-    query: Annotated[Optional[str], typer.Argument(help="搜索关键词")] = None,
+    query: Annotated[Optional[str], typer.Argument(help=tr("cli.args.query"))] = None,
     repo: Annotated[
-        Optional[str], typer.Argument(help="仓库路径 (可选，格式: owner/repo)")
+        Optional[str], typer.Argument(help=tr("cli.args.repo_optional"))
     ] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="JSON 格式输出")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.json"))
     ] = False,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="输出纯文本内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = False,
 ) -> None:
     """搜索仓库或文档关键词
@@ -3699,7 +3828,7 @@ def cmd_find(
     """
     if not query:
         typer.echo(ctx.get_help())
-        typer.echo("\n❌ 缺少必选参数: QUERY (搜索关键词)", err=True)
+        typer.echo(f"\n❌ {tr('errors.missing_query')}", err=True)
         raise typer.Exit(1)
     lang = _resolve_lang(lang)
 
@@ -3735,12 +3864,12 @@ def _search_in_repo(
     """在仓库文档内搜索关键词"""
     status = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在获取仓库信息...[/dim]",
+        f"[dim]{tr('status.fetch_repo_info', lang)}[/dim]",
         fetch_repo_metadata,
         repo,
     )
     if not status or not status.get("wiki_id"):
-        typer.echo("错误: 无法获取仓库元数据", err=True)
+        typer.echo(tr("errors.fetch_repo_metadata", lang), err=True)
         raise typer.Exit(1)
 
     wiki_id = status["wiki_id"]
@@ -3748,11 +3877,11 @@ def _search_in_repo(
 
     results = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在搜索文档...[/dim]",
+        f"[dim]{tr('status.search_docs', lang)}[/dim]",
         _cli_http_get,
         search_url,
         lang=lang,
-        error_msg="搜索失败",
+        error_msg=tr("errors.search_failed", lang),
         params={"q": keyword},
     )
 
@@ -3761,7 +3890,7 @@ def _search_in_repo(
         return
 
     if not results:
-        typer.echo("无结果")
+        typer.echo(tr("messages.no_results", lang))
         return
 
     if plain:
@@ -3777,11 +3906,11 @@ def _search_repos(
     """搜索 GitHub 仓库"""
     data = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在搜索仓库...[/dim]",
+        f"[dim]{tr('status.search_repos', lang)}[/dim]",
         _cli_http_get,
         f"{BASE_URL}/api/v1/repo?q={urllib.parse.quote(query)}",
         lang=lang,
-        error_msg="搜索失败",
+        error_msg=tr("errors.search_failed", lang),
     )
     if isinstance(data, dict):
         data = data.get("list", [])
@@ -3791,7 +3920,7 @@ def _search_repos(
         return
 
     if not data:
-        typer.echo("无结果")
+        typer.echo(tr("messages.no_results", lang))
         return
 
     if plain:
@@ -3801,17 +3930,17 @@ def _search_repos(
         _format_repo_list_rich(data, lang)
 
 
-@cli_app.command(name="top")
+@cli_app.command(name="top", help=tr("cli.commands.top"))
 def cmd_top(
-    weeks: Annotated[int, typer.Argument(help="显示最近几周内的榜单")] = 1,
+    weeks: Annotated[int, typer.Argument(help=tr("cli.args.weeks"))] = 1,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="JSON 格式输出")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.json"))
     ] = False,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="输出纯文本内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = False,
 ) -> None:
     """获取热门仓库榜单
@@ -3825,11 +3954,11 @@ def cmd_top(
     lang = _resolve_lang(lang)
     result = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在获取热门仓库...[/dim]",
+        f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
         _cli_http_get,
         f"{BASE_URL}/api/v1/public/repo/trending",
         lang=lang,
-        error_msg="无法获取热门仓库",
+        error_msg=tr("errors.fetch_trending", lang),
     )
     # 限制显示最近 weeks 周的榜单
     limited_result = result[:weeks] if isinstance(result, list) else []
@@ -3845,22 +3974,20 @@ def cmd_top(
         _format_trending_rich(limited_result, lang)
 
 
-@cli_app.command(name="rand")
+@cli_app.command(name="rand", help=tr("cli.commands.rand"))
 def cmd_rand(
     topic: Annotated[
         str,
-        typer.Argument(
-            help="GitHub topic 标签，如 python、awesome-list、agent-skills (可选)"
-        ),
+        typer.Argument(help=tr("cli.args.topic_optional")),
     ] = "",
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="JSON 格式输出")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.json"))
     ] = False,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="输出纯文本内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = False,
 ) -> None:
     """随机发现推荐仓库
@@ -3886,11 +4013,11 @@ def cmd_rand(
         url += f"?topic={urllib.parse.quote(topic)}"
     data = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在获取推荐仓库...[/dim]",
+        f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
         _cli_http_get,
         url,
         lang=lang,
-        error_msg="无法获取推荐仓库",
+        error_msg=tr("errors.fetch_recommend", lang),
     )
 
     if json_output:
@@ -3980,35 +4107,33 @@ def _get_ai_unavailable_message(
 ) -> str:
     """根据仓库状态生成 AI 不可用提示。"""
     if not metadata:
-        return "错误: 无法获取仓库状态"
+        return tr("errors.fetch_repo_status")
 
     if metadata.get("wiki_id"):
         return ""
 
     status = metadata.get("status", "")
     if status == "inactive":
-        return f"错误: 仓库尚未被 zread 收录，已在后台提交索引，请稍后重试或先执行 `zread stat {repo_path}` 查看状态"
+        return tr("errors.repo_not_indexed", repo=repo_path)
     if status == "progress":
-        return f"错误: 仓库正在索引中，请稍后重试或先执行 `zread stat {repo_path}` 查看状态"
+        return tr("errors.repo_indexing", repo=repo_path)
     if not metadata.get("wiki_id"):
-        return "错误: 仓库缺少可用文档索引，暂时无法进行 AI 对话"
-    return "错误: 仓库当前不可用于 AI 对话"
+        return tr("errors.repo_missing_docs")
+    return tr("errors.repo_ai_unavailable")
 
 
-@cli_app.command(name="stat")
+@cli_app.command(name="stat", help=tr("cli.commands.stat"))
 def cmd_stat(
     ctx: typer.Context,
-    repo: Annotated[
-        Optional[str], typer.Argument(help="仓库路径，格式: owner/repo")
-    ] = None,
+    repo: Annotated[Optional[str], typer.Argument(help=tr("cli.args.repo"))] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="JSON 格式输出")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.json"))
     ] = False,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="输出纯文本内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = False,
 ) -> None:
     """显示仓库信息
@@ -4020,18 +4145,18 @@ def cmd_stat(
     """
     if not repo:
         typer.echo(ctx.get_help())
-        typer.echo("\n❌ 缺少必选参数: REPO (仓库路径，格式: owner/repo)", err=True)
+        typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
     lang = _resolve_lang(lang)
 
     data = _run_with_cli_status(
         not (json_output or plain),
-        "[dim]正在获取仓库信息...[/dim]",
+        f"[dim]{tr('status.fetch_repo_info', lang)}[/dim]",
         fetch_repo_metadata,
         repo,
     )
     if data is None:
-        typer.echo("错误: 无法获取仓库信息", err=True)
+        typer.echo(tr("errors.fetch_repo_info", lang), err=True)
         raise typer.Exit(1)
 
     if json_output:
@@ -4053,30 +4178,29 @@ def cmd_stat(
 
 @cli_app.command(
     name="ai",
+    help=tr("cli.commands.ai"),
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
 def cmd_ai(
     ctx: typer.Context,
-    repo: Annotated[
-        Optional[str], typer.Argument(help="仓库路径，格式: owner/repo")
-    ] = None,
+    repo: Annotated[Optional[str], typer.Argument(help=tr("cli.args.repo"))] = None,
     question: Annotated[
-        Optional[str], typer.Argument(help="问题（可选，不传则进入交互模式）")
+        Optional[str], typer.Argument(help=tr("cli.args.question_optional"))
     ] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     token: Annotated[
-        Optional[str], typer.Option("--token", "-t", help="ZREAD_TOKEN")
+        Optional[str], typer.Option("--token", "-t", help=tr("cli.options.token"))
     ] = None,
     plain: Annotated[
-        bool, typer.Option("--plain", "-p", help="只流式打印正文内容")
+        bool, typer.Option("--plain", "-p", help=tr("cli.options.ai_plain"))
     ] = False,
     json_output: Annotated[
-        bool, typer.Option("--json", "-j", help="最终一次性返回思考和正文的 JSON")
+        bool, typer.Option("--json", "-j", help=tr("cli.options.ai_json"))
     ] = False,
     model: Annotated[
-        str, typer.Option("--model", "-m", help="模型: glm-4.7 或 claude-sonnet-4.5")
+        str, typer.Option("--model", "-m", help=tr("cli.options.model"))
     ] = "glm-4.7",
 ) -> None:
     """向仓库 AI 提问 (需要 token)
@@ -4090,7 +4214,7 @@ def cmd_ai(
     """
     if not repo:
         typer.echo(ctx.get_help())
-        typer.echo("\n❌ 缺少必选参数: REPO (仓库路径，格式: owner/repo)", err=True)
+        typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
     if ctx.args:
         question_parts = [question] if question else []
@@ -4101,7 +4225,7 @@ def cmd_ai(
 
     _set_token(token)
     if not _DEFAULT_TOKEN:
-        typer.echo("错误: ai 命令需要 ZREAD_TOKEN", err=True)
+        typer.echo(tr("errors.ai_requires_token"), err=True)
         raise typer.Exit(1)
     lang = _resolve_lang(lang)
 
@@ -4114,7 +4238,7 @@ def cmd_ai(
 
             talk_id = create_talk(_DEFAULT_TOKEN, lang)
             if not talk_id:
-                typer.echo("错误: 无法创建对话", err=True)
+                typer.echo(tr("errors.create_talk", lang), err=True)
                 raise typer.Exit(1)
 
             asyncio.run(
@@ -4181,7 +4305,10 @@ async def _ask_single_turn(
                     if text:
                         typer.echo(text, nl=False)
                 elif chunk.get("event") == "error":
-                    typer.echo(f"\n错误: {chunk.get('text', '未知错误')}", err=True)
+                    typer.echo(
+                        f"\n{tr('errors.error_prefix', lang)} {chunk.get('text', tr('messages.unknown_error', lang))}",
+                        err=True,
+                    )
                     return
         typer.echo("")
     else:
@@ -4190,11 +4317,13 @@ async def _ask_single_turn(
         console = Console()
         wiki_id, page_id, repo_id, error_message = await _await_with_status(
             console,
-            "[dim]准备中...[/dim]",
+            f"[dim]{tr('status.preparing', lang)}[/dim]",
             asyncio.to_thread(_get_repo_ai_context, repo_path, lang),
         )
         if error_message:
-            console.print(f"[red]❌ {error_message.replace('错误: ', '', 1)}[/]")
+            console.print(
+                f"[red]❌ {error_message.replace(tr('errors.error_prefix', lang) + ' ', '', 1)}[/]"
+            )
             return
 
         await _ask_with_live(
@@ -4251,8 +4380,10 @@ async def _ask_interactive(
     from rich.console import Console
 
     console = Console()
-    console.print(f"\n[bold green]🤖 进入 AI 对话模式[/] (仓库: [cyan]{repo_path}[/])")
-    console.print("[dim]输入消息后按 Enter 发送 | 输入 exit 退出[/]\n")
+    console.print(
+        f"\n[bold green]🤖 {tr('messages.ai_mode_title', lang)}[/] ([cyan]{tr('messages.repo_label', lang)}: {repo_path}[/])"
+    )
+    console.print(f"[dim]{tr('messages.ai_mode_hint', lang)}[/]\n")
 
     # 立即后台异步初始化（创建对话 + 获取仓库信息）
     init_task = asyncio.create_task(_init_chat_session(repo_path, lang, token))
@@ -4277,17 +4408,17 @@ async def _ask_interactive(
                 if not init_task.done():
                     talk_id, wiki_id, page_id, repo_id = await _await_with_status(
                         console,
-                        "[dim]准备中...[/dim]",
+                        f"[dim]{tr('status.preparing', lang)}[/dim]",
                         init_task,
                     )
                 elif talk_id is None:
                     talk_id, wiki_id, page_id, repo_id = await init_task
 
                 if talk_id is None:
-                    typer.echo("❌ 无法创建对话", err=True)
+                    typer.echo(f"❌ {tr('errors.create_talk', lang)}", err=True)
                     continue
                 if wiki_id is None:
-                    typer.echo("❌ 无法获取仓库元数据", err=True)
+                    typer.echo(f"❌ {tr('errors.fetch_repo_metadata', lang)}", err=True)
                     continue
 
                 # 准备生成器
@@ -4305,7 +4436,7 @@ async def _ask_interactive(
 
                 if plain:
                     it, first_chunk = await _get_first_async_chunk_with_status(
-                        console, "[dim]思考中...[/dim]", gen
+                        console, f"[dim]{tr('status.thinking', lang)}[/dim]", gen
                     )
 
                     # 渲染首包及后续包
@@ -4356,7 +4487,7 @@ async def _ask_with_live(
         talk_id, repo_path, question, None, model, lang, wiki_id, page_id, repo_id
     )
     it, first_chunk = await _get_first_async_chunk_with_status(
-        console, "[dim]思考中...[/dim]", gen
+        console, f"[dim]{tr('status.thinking', lang)}[/dim]", gen
     )
     if first_chunk is None:
         return
@@ -4383,7 +4514,7 @@ async def _ask_with_live(
                 panels.append(
                     Panel(
                         Text(reasoning_text.replace("\n", "  "), style="dim"),
-                        title="💭 思考过程",
+                        title=tr("messages.reasoning_title", lang),
                         box=SIMPLE_HEAD,
                         title_align="left",
                     )
@@ -4793,21 +4924,19 @@ def _generate_llms_txt(
     return llms_file
 
 
-@cli_app.command(name="cp")
+@cli_app.command(name="cp", help=tr("cli.commands.cp"))
 def cmd_cp(
     ctx: typer.Context,
-    repo: Annotated[
-        Optional[str], typer.Argument(help="仓库路径，格式: owner/repo")
-    ] = None,
+    repo: Annotated[Optional[str], typer.Argument(help=tr("cli.args.repo"))] = None,
     output_dir: Annotated[
         Optional[Path],
-        typer.Argument(help="输出目录 (默认: 当前目录)"),
+        typer.Argument(help=tr("cli.args.output_dir")),
     ] = None,
     lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help="语言 (zh/en)")
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
     concurrency: Annotated[
-        int, typer.Option("--concurrency", "-c", help="并发数 (默认: 10)")
+        int, typer.Option("--concurrency", "-c", help=tr("cli.options.concurrency"))
     ] = 10,
 ) -> None:
     """导出仓库文档到本地
@@ -4821,7 +4950,7 @@ def cmd_cp(
     """
     if not repo:
         typer.echo(ctx.get_help())
-        typer.echo("\n❌ 缺少必选参数: REPO (仓库路径，格式: owner/repo)", err=True)
+        typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
     lang = _resolve_lang(lang)
 
@@ -4833,16 +4962,16 @@ def cmd_cp(
     owner, repo_name = parsed["owner"], parsed["repo"]
     repo_dir_name = f"{owner}-{repo_name}"
 
-    typer.echo(f"📦 正在导出: {owner}/{repo_name}")
-    typer.echo(f"📁 输出目录: {output_dir / repo_dir_name}")
-    typer.echo(f"🌐 语言: {lang}")
-    typer.echo(f"⚡ 并发数: {concurrency}")
+    typer.echo(tr("messages.exporting_repo", lang, repo=f"{owner}/{repo_name}"))
+    typer.echo(tr("messages.output_dir", lang, path=str(output_dir / repo_dir_name)))
+    typer.echo(tr("messages.language_label", lang, lang_code=lang))
+    typer.echo(tr("messages.concurrency_label", lang, concurrency=concurrency))
     typer.echo("")
 
     # 先获取页面数量
     pages = fetch_repo_outline(repo, lang=lang)
     if not pages:
-        typer.echo("❌ 无法获取文档大纲", err=True)
+        typer.echo(f"❌ {tr('errors.fetch_outline', lang)}", err=True)
         raise typer.Exit(1)
 
     try:
@@ -4857,7 +4986,8 @@ def cmd_cp(
             transient=True,
         ) as progress:
             task_id = progress.add_task(
-                f"📥 下载 {owner}/{repo_name}...", total=len(pages)
+                tr("status.downloading_repo", lang, repo=f"{owner}/{repo_name}"),
+                total=len(pages),
             )
             result = asyncio.run(
                 _export_repo_async(
@@ -4866,30 +4996,35 @@ def cmd_cp(
             )
 
         if not result.get("success"):
-            typer.echo(f"❌ 导出失败: {result.get('error')}", err=True)
+            typer.echo(
+                tr("errors.export_failed_with_reason", lang, error=result.get("error")),
+                err=True,
+            )
             raise typer.Exit(1)
 
         # 显示结果
-        typer.echo("✅ 导出完成!")
-        typer.echo(f"   总计: {result['total']} 页")
-        typer.echo(f"   成功: {result['successful']} 页")
-        typer.echo(f"   失败: {result['failed']} 页")
+        typer.echo(tr("messages.export_complete", lang))
+        typer.echo(tr("messages.export_total", lang, count=result["total"]))
+        typer.echo(tr("messages.export_success", lang, count=result["successful"]))
+        typer.echo(tr("messages.export_failed", lang, count=result["failed"]))
         typer.echo("")
-        typer.echo(f"📄 文档目录: {result['repo_dir']}")
-        typer.echo(f"📄 llms.txt (目录索引): {result['llms_file']}")
-        typer.echo(f"📄 llms-full.txt (完整内容): {result['llms_full_file']}")
+        typer.echo(tr("messages.export_repo_dir", lang, path=result["repo_dir"]))
+        typer.echo(tr("messages.export_llms_file", lang, path=result["llms_file"]))
+        typer.echo(
+            tr("messages.export_llms_full_file", lang, path=result["llms_full_file"])
+        )
 
         if result["failed"] > 0:
             typer.echo("")
-            typer.echo("⚠️  以下页面导出失败:")
+            typer.echo(tr("messages.export_failed_pages", lang))
             for f in result["failed_pages"][:5]:
                 page = f.get("page", {})
                 slug = page.get("slug", "unknown")
-                error = f.get("error", "未知错误")
+                error = f.get("error", tr("messages.unknown_error", lang))
                 typer.echo(f"   - {slug}: {error}", err=True)
 
     except Exception as e:
-        typer.echo(f"\n❌ 导出失败: {e}", err=True)
+        typer.echo(tr("errors.export_failed_with_reason", lang, error=e), err=True)
         raise typer.Exit(1)
 
 
@@ -4967,43 +5102,9 @@ def _run_mcp_server(
 
     # 打印启动信息到 stderr
     if has_token:
-        print(
-            "🔑 已配置 ZREAD_TOKEN，所有功能可用:\n"
-            "   ✓ read_page - 读取文档页面\n"
-            "   ✓ search_docs - 搜索文档\n"
-            "   ✓ read_outline - 读取文档大纲\n"
-            "   ✓ discover - 发现推荐仓库\n"
-            "   ✓ find - 搜索仓库\n"
-            "   ✓ trending - 热门仓库榜单\n"
-            "   ✓ info - 仓库信息\n"
-            "   ✓ ask - AI 智能问答\n"
-            "   ✓ read_file - 读取仓库文件",
-            file=sys.stderr,
-        )
+        print(tr("mcp.token_enabled"), file=sys.stderr)
     else:
-        print(
-            "📝 未配置 ZREAD_TOKEN，以基础模式运行:\n"
-            "   ✓ read_page - 读取文档页面\n"
-            "   ✓ search_docs - 搜索文档\n"
-            "   ✓ read_outline - 读取文档大纲\n"
-            "   ✓ discover - 发现推荐仓库\n"
-            "   ✓ find - 搜索仓库\n"
-            "   ✓ trending - 热门仓库榜单\n"
-            "   ✓ info - 仓库信息\n"
-            "   ✓ read_file - 读取仓库文件\n"
-            "   ✗ ask - AI 智能问答 (需 Token)\n"
-            "\n"
-            "💡 如需使用 AI 问答功能，请配置 Token:\n"
-            "   方式 1 - 环境变量: export ZREAD_TOKEN='your-token'\n"
-            "   方式 2 - 命令行参数: --token 'your-token'\n"
-            "\n"
-            "🔑 如何获取 Token:\n"
-            "   1. 访问 https://zread.ai 并登录账号\n"
-            "   2. 按 F12 打开浏览器控制台\n"
-            "   3. 粘贴运行: prompt('复制token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)\n"
-            "   4. 在弹出的对话框中复制 Token 值",
-            file=sys.stderr,
-        )
+        print(tr("mcp.token_missing"), file=sys.stderr)
 
     if transport == "stdio":
         # stdio 模式：完全禁用所有日志输出，避免污染 stdout
@@ -5025,11 +5126,14 @@ def _run_mcp_server(
     else:
         # HTTP/SSE 模式：显示传输模式信息
         if transport == "sse":
-            print(f"启动 SSE 模式: http://{host}:{port}{path}", file=sys.stderr)
+            print(
+                tr("mcp.sse_started", url=f"http://{host}:{port}{path}"),
+                file=sys.stderr,
+            )
             mcp.run(transport="sse", host=host, port=port, path=path)
         elif transport == "http":
             print(
-                f"启动 HTTP 模式: http://{host}:{port}{path}",
+                tr("mcp.http_started", url=f"http://{host}:{port}{path}"),
                 file=sys.stderr,
             )
             mcp.run(
