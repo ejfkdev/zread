@@ -48,7 +48,6 @@ import darkdetect
 import httpx as _httpx
 import i18n
 import typer
-from pylocale import PyLocale
 from rich.box import SIMPLE_HEAD
 
 # Rich 用于 Markdown 渲染
@@ -97,7 +96,7 @@ _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", "")
 # 固定域名
 BASE_URL = "https://zread.ai"
 APP_NAME = "zread"
-APP_VERSION = "2.0.2"
+APP_VERSION = "2.0.3"
 
 # User-Agent
 USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/efjdkev/zread)"
@@ -108,7 +107,6 @@ DEFAULT_HEADERS = {
 }
 
 LOCALES_DIR = Path(__file__).resolve().parent / "locales"
-PYLOCALE_DIR = Path(__file__).resolve().parent / "pylocale"
 
 # Markdown 链接正则（slug 转链接）
 SLUG_LINK_PATTERN = re.compile(
@@ -989,7 +987,7 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
 
 
 def _get_default_lang() -> str:
-    """获取默认语言，优先级：CLI --lang > ZREAD_LANG > PyLocale > en。"""
+    """获取默认语言，优先级：CLI --lang > ZREAD_LANG > 系统locale > en。"""
     argv = sys.argv[1:]
     for idx, arg in enumerate(argv):
         if arg.startswith("--lang="):
@@ -1020,8 +1018,14 @@ def _normalize_lang_code(raw_lang: Optional[str]) -> str:
 
 
 def _detect_lang_with_pylocale() -> str:
-    """使用 PyLocale 根据系统 locale 在受支持语言中做归一化判定。"""
+    """根据系统 locale 检测语言，兼容 Windows/Linux/macOS。"""
     candidates: List[str] = []
+
+    # 先尝试 setlocale 初始化（跨平台兼容）
+    try:
+        locale.setlocale(locale.LC_ALL, "")
+    except Exception:
+        pass
 
     try:
         current_locale, _ = locale.getlocale()
@@ -1037,14 +1041,8 @@ def _detect_lang_with_pylocale() -> str:
 
     for raw_lang in candidates:
         lang = _normalize_lang_code(raw_lang.split(".", 1)[0])
-        try:
-            detector = PyLocale(at=str(PYLOCALE_DIR), root="en", silent=True)
-            detector.switch(lang)
-            detected = detector["lang"].strip()
-            if detected in ("zh", "en"):
-                return detected
-        except Exception:
-            continue
+        if lang in ("zh", "en"):
+            return lang
 
     return "en"
 

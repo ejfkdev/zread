@@ -1,10 +1,10 @@
-# Zread - AI 代码仓库阅读助手
+# Zread - AI Repository Reading Assistant
 
-中文 | [English](README.en.md)
+[中文](README.zh.md) | English
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-2.0.2-0A7B83)](https://pypi.org/project/zread/)
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/ejfkdev/zread)
+[![Version](https://img.shields.io/badge/Version-2.0.3-0A7B83)](https://pypi.org/project/zread/)
+[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS42MDE1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/ejfkdev/zread)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-green)](https://modelcontextprotocol.io/)
 [![CLI](https://img.shields.io/badge/Interface-CLI-2E8B57)](https://pypi.org/project/zread/)
 [![Transport](https://img.shields.io/badge/Transport-stdio%20%7C%20http%20%7C%20sse-6A5ACD)](https://github.com/ejfkdev/zread)
@@ -13,209 +13,207 @@
 [![Downloads](https://img.shields.io/pypi/dm/zread)](https://pypi.org/project/zread/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 [Zread.ai](https://zread.ai)，AI 驱动的 GitHub 项目文档。
+Zread helps you and your AI understand codebases faster. Skip the manual source dive and ask directly. It connects to [Zread.ai](https://zread.ai), an AI-powered GitHub project documentation service.
 
-**双重身份**：
+**Two roles**:
 
-- 🖥️ **CLI 工具** - 直接在终端运行，无需配置
-- 🔌 **MCP 服务器** - 与 Claude、Cline 等 AI 助手集成
+- 🖥️ **CLI tool** - run directly in your terminal with minimal setup
+- 🔌 **MCP server** - integrate with AI assistants such as Claude and Cline
 
-**核心特点**：
+**Highlights**:
 
-- 🔍 无需 Token 即可浏览文档、搜索代码、发现仓库
-- 🤖 支持 AI 智能问答（基于仓库文档训练）
-- 🌐 支持多种传输协议：stdio、HTTP、SSE
-- ⚡ 一行命令即可运行，零配置上手
+- 🔍 Browse docs, search code, and discover repositories without a token
+- 🤖 AI Q&A powered by repository documentation
+- 🌐 Multiple transports: stdio, HTTP, and SSE
+- ⚡ One command to run, zero-friction startup
 
-## 功能
+## Features
 
-- 📖 **阅读文档** - 直接在终端浏览 GitHub 仓库文档
-- 🔍 **搜索代码** - 在仓库文档中搜索关键词
-- 🌟 **发现仓库** - 浏览热门榜单、搜索优质项目
-- 📥 **导出文档** - 批量导出仓库文档到本地，生成 llms.txt 和 llms-full.txt（CLI 专属）
-- 🤖 **AI 问答** - 向仓库 AI 助手提问（需登录账号的免费 Token）
-- 📄 **查看源码** - 读取源代码文件内容
-- 🔌 **MCP 集成** - 与 AI 助手无缝集成
+- 📖 **Read docs** - browse GitHub repository docs directly in the terminal
+- 🔍 **Search docs** - search keywords across repository documentation
+- 🌟 **Discover repos** - browse trending rankings and recommended projects
+- 📥 **Export docs** - export repository docs locally and generate `llms.txt` and `llms-full.txt` (CLI only)
+- 🤖 **AI Q&A** - ask the repository AI assistant questions (requires a free account token)
+- 📄 **Read source files** - inspect source file contents directly
+- 🔌 **MCP integration** - connect seamlessly with AI assistants
 
-## 运行示例
+## Screenshots
 
 <table>
   <tr>
     <td align="center">
-      <strong>帮助信息</strong><br>
+      <strong>Help</strong><br>
       <code>zread -h</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/help.png" alt="zread help" width="100%">
     </td>
     <td align="center">
-      <strong>文档目录</strong><br>
+      <strong>Documentation Outline</strong><br>
       <code>zread ls openclaw/openclaw</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ls.png" alt="zread ls" width="100%">
     </td>
     <td align="center">
-      <strong>查看文档页</strong><br>
+      <strong>Read a Doc Page</strong><br>
       <code>zread cat openclaw/openclaw</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cat-wiki.png" alt="zread cat wiki" width="100%">
     </td>
     <td align="center">
-      <strong>查看 GitHub 文件</strong><br>
+      <strong>Read a GitHub File</strong><br>
       <code>zread cat facebook/react README.md</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cat-github.png" alt="zread cat github" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
-      <strong>搜索仓库</strong><br>
+      <strong>Search Repositories</strong><br>
       <code>zread find ai sandbox</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/find-repo.png" alt="zread find repo" width="100%">
     </td>
     <td align="center">
-      <strong>搜索文档</strong><br>
+      <strong>Search Documentation</strong><br>
       <code>zread find openclaw/openclaw gateway</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/find-wiki.png" alt="zread find wiki" width="100%">
     </td>
     <td align="center">
-      <strong>热门仓库</strong><br>
+      <strong>Trending Repos</strong><br>
       <code>zread top</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/top.png" alt="zread top" width="100%">
     </td>
     <td align="center">
-      <strong>随机推荐</strong><br>
+      <strong>Random Recommendation</strong><br>
       <code>zread rand agent-skills</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/rand.png" alt="zread rand" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
-      <strong>单轮 AI 提问</strong><br>
-      <code>zread ai openclaw/openclaw 介绍这个库 简单讲讲</code><br><br>
+      <strong>Single-turn AI Q&A</strong><br>
+      <code>zread ai openclaw/openclaw "introduce this project briefly"</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ai-ask.png" alt="zread ai ask" width="100%">
     </td>
     <td align="center">
-      <strong>交互式 AI 对话</strong><br>
+      <strong>Interactive AI Chat</strong><br>
       <code>zread ai openclaw/openclaw</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ai-chat.png" alt="zread ai chat" width="100%">
     </td>
     <td align="center">
-      <strong>导出仓库文档</strong><br>
+      <strong>Export Repository Docs</strong><br>
       <code>zread cp openclaw/openclaw</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cp.png" alt="zread cp" width="100%">
     </td>
     <td align="center">
-      <strong>MCP HTTP 服务</strong><br>
+      <strong>MCP HTTP Service</strong><br>
       <code>zread mcp http :8080</code><br><br>
       <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/mcp-http.png" alt="zread mcp http" width="100%">
     </td>
   </tr>
 </table>
 
-## 快速启动
+## Quick Start
 
-### 命令行工具
+### CLI Tool
 
 ```bash
-# 使用 uvx 运行
+# Run with uvx
 uvx zread
 
-# 或使用 pipx
+# Or with pipx
 pipx run zread
 ```
 
-### MCP 服务器
+### MCP Server
 
 ```bash
-# stdio 模式
+# stdio mode
 uvx zread mcp
 
-# HTTP 模式
+# HTTP mode
 uvx zread mcp http
 ```
 
-### AI 问答
+### AI Q&A
 
-AI 问答功能需要登录 [Zread.ai](https://zread.ai) 账号获取免费 Token。
+AI Q&A requires a free token from your [Zread.ai](https://zread.ai) account.
 
-**配置 Token：**
+**Set your token:**
 
 ```bash
-# 设置环境变量
 export ZREAD_TOKEN=your-token
 ```
 
-**用法：**
+**Usage:**
 
 ```bash
-# 连续问答：进入交互模式，随时追问
+# Interactive multi-turn chat
 zread ai openclaw/openclaw
 
-# 单次对话：直接提问
-zread ai facebook/react "这个项目的代码结构是怎样的"
+# Single question
+zread ai facebook/react "How is this project structured?"
 ```
 
-## CLI 命令
+## CLI Commands
 
 ```bash
-# 启动 MCP 服务器
+# Start the MCP server
 zread mcp [stdio|http|sse] [address] [options]
 
-# 获取仓库文档目录结构
+# Show the documentation outline
 zread ls <repo> [-l zh|en] [-j] [-p]
 
-# 获取指定页面内容或源代码文件
+# Read a documentation page or a source file
 zread cat <repo> [slug_or_path] [-l zh|en] [-j] [-p]
 #
-# 自动识别参数类型：
-# - 第一个参数只有 repo，第二个参数是 slug/序号(如: 1-overview, 1): 读取 zread 文档页面
-# - 其他格式(如: README.md, owner/repo/README.md#L1-10, github.com/owner/repo/README.md#L1-10): 读取 GitHub 文件内容
+# Automatic argument detection:
+# - If the first argument is only repo and the second is a slug/index (for example 1-overview, 1), it reads a zread doc page
+# - Other forms (for example README.md, owner/repo/README.md#L1-10, github.com/owner/repo/README.md#L1-10) read a GitHub file
 
-# 搜索
-zread find <query>                        # 搜索 GitHub 仓库
-zread find <repo> <query>                 # 在仓库文档内搜索
+# Search
+zread find <query>                        # Search GitHub repositories
+zread find <repo> <query>                 # Search within a repository's docs
 
-# 发现推荐仓库
+# Discover recommended repositories
 zread rand [topic] [-l zh|en] [-j] [-p]
 
-# 获取热门仓库榜单
+# Show trending repositories
 zread top [weeks] [-l zh|en] [-j] [-p]
 
-# 获取仓库信息
+# Show repository status and metadata
 zread stat <repo> [-l zh|en] [-j] [-p]
 
-# 向仓库 AI 提问（需要登录账号的免费 Token）
+# Ask the repository AI (requires a free account token)
 zread ai <repo> [question] [-l zh|en] [-t token] [-p] [-j] [-m model]
 
-
-# 导出仓库文档到本地（CLI 专属，生成 llms.txt 和 llms-full.txt）
+# Export repository docs locally and generate llms.txt / llms-full.txt
 zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
 ```
 
-### 全局选项
+### Global Options
 
-命令行支持纯文本与 JSON 输出，兼容管道工具流：
+The CLI supports plain text and JSON output and works well in pipelines:
 
-| 选项                 | 说明                                                           |
-| -------------------- | -------------------------------------------------------------- |
-| `-l, --lang {zh,en}` | 语言（优先级：`--lang` > `ZREAD_LANG` > PyLocale，默认 `en`） |
-| `-j, --json`         | JSON 格式输出                                                  |
-| `-p, --plain`        | 纯文本输出                                                     |
-| `-t, --token`        | ZREAD_TOKEN                                                    |
-| `-h, --help`         | 显示帮助                                                       |
-| `-v, --version`      | 显示版本                                                       |
+| Option               | Description                                                            |
+| -------------------- | ---------------------------------------------------------------------- |
+| `-l, --lang {zh,en}` | Language priority: `--lang` > `ZREAD_LANG` > system locale, default `en`. |
+| `-j, --json`         | Output as JSON                                                         |
+| `-p, --plain`        | Output plain text                                                      |
+| `-t, --token`        | ZREAD_TOKEN                                                            |
+| `-h, --help`         | Show help                                                              |
+| `-v, --version`      | Show version                                                           |
 
-### 命令示例
+### Examples
 
 ```bash
-# MCP 服务器
-uvx zread mcp                          # stdio 模式（默认）
-uvx zread mcp http                     # HTTP 模式
-uvx zread mcp http :8080               # 指定端口
-uvx zread mcp http 0.0.0.0:3000/custom # 自定义地址和路径
+# MCP server
+uvx zread mcp                          # stdio mode (default)
+uvx zread mcp http                     # HTTP mode
+uvx zread mcp http :8080               # Custom port
+uvx zread mcp http 0.0.0.0:3000/custom # Custom address and path
 
-# 文档相关
-uvx zread ls golang/go                 # 查看文档目录
-uvx zread cat vuejs/vue                # 查看 zread 首页
-uvx zread cat vuejs/vue 1              # zread 文档（使用序号）
-uvx zread cat vuejs/vue 1-overview     # zread 文档（使用 slug）
-uvx zread cat golang/go README.md      # 查看 GitHub 文件
+# Docs
+uvx zread ls golang/go
+uvx zread cat vuejs/vue
+uvx zread cat vuejs/vue 1
+uvx zread cat vuejs/vue 1-overview
+uvx zread cat golang/go README.md
 uvx zread cat python/cpython Lib/http/client.py
 uvx zread cat github.com/facebook/react/README.md#L1-10
 uvx zread cat facebook/react/README.md#L1-10
@@ -225,29 +223,29 @@ uvx zread cat facebook/react README.md 5~
 uvx zread cat facebook/react/README.md 5:
 uvx zread find facebook/react hooks
 
-# 仓库发现
-uvx zread top                          # 本周热门
-uvx zread top 4                        # 最近4周
-uvx zread rand python                  # Python 项目
-uvx zread rand awesome-list            # 精选资源
+# Discovery
+uvx zread top
+uvx zread top 4
+uvx zread rand python
+uvx zread rand awesome-list
 
-# 仓库信息
+# Repository info
 uvx zread stat torvalds/linux
 
-# AI 问答（需要登录账号的免费 Token）
-uvx zread ai golang/go "channel 和 mutex 怎么选择" -t your-token
+# AI Q&A
+uvx zread ai golang/go "How do I choose between channels and mutexes?" -t your-token
 uvx zread ai python/cpython --model claude-sonnet-4.5 -t your-token
-uvx zread ai rust-lang/rust            # 进入交互模式
+uvx zread ai rust-lang/rust
 
-# 导出文档
-uvx zread cp golang/go                          # 导出到当前目录
-uvx zread cp python/cpython -l zh               # 指定语言
-uvx zread cp vuejs/vue -c 20                    # 调整并发数
+# Export docs
+uvx zread cp golang/go
+uvx zread cp python/cpython -l zh
+uvx zread cp vuejs/vue -c 20
 ```
 
-## MCP 客户端配置
+## MCP Client Configuration
 
-在支持 MCP 的客户端中添加以下配置：
+Add the following configuration to any MCP-compatible client:
 
 ```json
 {
@@ -260,45 +258,45 @@ uvx zread cp vuejs/vue -c 20                    # 调整并发数
 }
 ```
 
-## MCP 工具
+## MCP Tools
 
-| 工具           | 说明                                                                       |
-| -------------- | -------------------------------------------------------------------------- |
-| `read_page`    | 获取指定文档页面内容                                                       |
-| `search_docs`  | 在仓库文档中搜索关键词                                                     |
-| `read_outline` | 获取仓库文档目录结构                                                       |
-| `discover`     | 随机发现推荐仓库                                                           |
-| `trending`     | 热门仓库榜单                                                               |
-| `info`         | 获取仓库信息和索引状态                                                     |
-| `read_file`    | 获取源代码文件内容                                                         |
-| `ask`          | 向仓库 AI 智能问答（需 Token），支持 `glm-4.7` 和 `claude-sonnet-4.5` 模型 |
+| Tool           | Description                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
+| `read_page`    | Get the content of a specific documentation page                            |
+| `search_docs`  | Search keywords in repository documentation                                 |
+| `read_outline` | Get the repository documentation outline                                    |
+| `discover`     | Discover a recommended repository at random                                 |
+| `trending`     | Get trending repository rankings                                            |
+| `info`         | Get repository information and indexing status                              |
+| `read_file`    | Read source code file contents                                              |
+| `ask`          | Ask the repository AI a question (token required), supports `glm-4.7` and `claude-sonnet-4.5` |
 
-## 获取 Token
+## Get a Token
 
-AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
+AI Q&A requires a free JWT token from your Zread.ai account:
 
-1. 访问 https://zread.ai 并登录
-2. 按 F12 打开浏览器控制台
-3. 粘贴运行：
+1. Visit https://zread.ai and sign in
+2. Press F12 to open the browser console
+3. Run:
    ```javascript
    prompt(
-     "复制token",
+     "copy token",
      JSON.parse(localStorage.getItem("CGX_AUTH_STORAGE")).state.token,
    );
    ```
-4. 复制弹窗中的 Token
+4. Copy the token from the popup dialog
 
-## 环境变量
+## Environment Variables
 
-| 变量          | 说明                                                          |
-| ------------- | ------------------------------------------------------------- |
-| `ZREAD_TOKEN` | zread.ai 登录账号的免费 JWT Token，仅 AI 问答功能需要         |
-| `ZREAD_LANG`  | 默认语言 (`zh` / `en`)，优先级低于 `--lang`，高于 PyLocale   |
+| Variable       | Description                                                        |
+| -------------- | ------------------------------------------------------------------ |
+| `ZREAD_TOKEN`  | Free JWT token from your zread.ai account, only required for AI Q&A |
+| `ZREAD_LANG`   | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
 
-## 贡献
+## Contributing
 
-欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解如何参与。
+Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
-## 许可证
+## License
 
-MIT License - 详见 [LICENSE](LICENSE) 文件
+MIT License. See [LICENSE](LICENSE) for details.

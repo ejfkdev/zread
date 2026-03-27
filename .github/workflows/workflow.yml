@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       ref_name:
-        description: Release tag to validate and publish, for example v2.0.2
+        description: Release tag to validate and publish, for example v2.0.3
         required: true
 
 jobs:

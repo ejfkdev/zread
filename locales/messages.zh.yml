@@ -3,7 +3,7 @@ zh:
     app_help: "Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。"
     env_vars_title: "环境变量"
     env_var_token_desc: "zread.ai 登录账号的 JWT token，仅 AI 问答功能需要"
-    env_var_lang_desc: "默认语言（zh/en），优先级低于 --lang、高于 PyLocale"
+    env_var_lang_desc: "默认语言（zh/en），优先级低于 --lang、高于系统locale"
     show_version: "显示版本号"
     show_help: "显示帮助信息"
     commands:
