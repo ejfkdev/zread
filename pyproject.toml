@@ -1,6 +1,6 @@
 [project]
 name = "zread"
-version = "2.0.4"
+dynamic = ["version"]
 description = "Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 zread.ai，AI 驱动的 GitHub 项目文档。"
 readme = "README.md"
 authors = [
@@ -24,12 +24,15 @@ license = { text = "MIT" }
 keywords = ["mcp", "context-protocol", "github", "ai", "zread"]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "setuptools-scm>=8.0"]
 build-backend = "hatchling.build"
+
+[tool.setuptools_scm]
+write_to = "zread/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["."]
-include = ["zread.py", "locales/**/*.yml"]
+include = ["zread.py", "zread/_version.py", "locales/**/*.yml"]
 
 [project.scripts]
 zread = "zread:main"

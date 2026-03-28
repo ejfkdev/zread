@@ -96,7 +96,16 @@ _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", "")
 # 固定域名
 BASE_URL = "https://zread.ai"
 APP_NAME = "zread"
-APP_VERSION = "2.0.4"
+
+# 版本号：从包元数据获取，本地开发时从 _version.py 获取
+try:
+    from importlib.metadata import version, PackageNotFoundError
+    APP_VERSION = version("zread")
+except PackageNotFoundError:
+    try:
+        from zread._version import __version__ as APP_VERSION
+    except (ImportError, ModuleNotFoundError):
+        APP_VERSION = "0.0.0"
 
 # User-Agent
 USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/efjdkev/zread)"
