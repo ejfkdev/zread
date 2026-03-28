@@ -96,7 +96,7 @@ _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", "")
 # 固定域名
 BASE_URL = "https://zread.ai"
 APP_NAME = "zread"
-APP_VERSION = "2.0.3"
+APP_VERSION = "2.0.4"
 
 # User-Agent
 USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/efjdkev/zread)"
@@ -1816,7 +1816,12 @@ def send_message(
             event_type = item.get("event")
             if event_type == "error":
                 continue
+            # 收集正文内容：
+            # - round_finish: 完整段落总结
+            # - answer 的 text: 正文片段（不包括 reasoning_content 思考内容）
             if event_type == "round_finish" and item.get("text"):
+                full_text.append(item["text"])
+            elif event_type == "answer" and item.get("text"):
                 full_text.append(item["text"])
 
     # 运行异步收集器
