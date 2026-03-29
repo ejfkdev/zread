@@ -24,19 +24,16 @@ license = { text = "MIT" }
 keywords = ["mcp", "context-protocol", "github", "ai", "zread"]
 
 [build-system]
-requires = ["hatchling", "setuptools-scm>=8.0"]
-build-backend = "hatchling.build"
+requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["zread*"]
+exclude = ["scripts*"]
 
 [tool.setuptools_scm]
 write_to = "zread/_version.py"
-
-[tool.hatch.version]
-source = "git"
-tag = true
-
-[tool.hatch.build.targets.wheel]
-packages = ["."]
-include = ["zread.py", "zread/_version.py", "locales/**/*.yml"]
 
 [project.scripts]
 zread = "zread:main"
