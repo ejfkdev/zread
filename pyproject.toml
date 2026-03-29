@@ -30,6 +30,9 @@ build-backend = "hatchling.build"
 [tool.setuptools_scm]
 write_to = "zread/_version.py"
 
+[tool.hatch.version]
+source = "setuptools_scm"
+
 [tool.hatch.build.targets.wheel]
 packages = ["."]
 include = ["zread.py", "zread/_version.py", "locales/**/*.yml"]
