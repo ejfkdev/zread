@@ -34,6 +34,7 @@ exclude = ["scripts*"]
 
 [tool.setuptools_scm]
 write_to = "zread/_version.py"
+local_scheme = "no-local-version"
 
 [project.scripts]
 zread = "zread:main"
