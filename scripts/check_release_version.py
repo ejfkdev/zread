@@ -4,20 +4,33 @@
 from __future__ import annotations
 
 import argparse
-import re
+import subprocess
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-PYPROJECT = ROOT / "pyproject.toml"
-ZREAD = ROOT / "zread.py"
 
 
-def _extract(pattern: str, content: str, source: str) -> str:
-    match = re.search(pattern, content, re.MULTILINE)
-    if not match:
-        raise SystemExit(f"Could not find version in {source}")
-    return match.group(1)
+def _get_git_version() -> str:
+    """Get version from git tag using setuptools-scm."""
+    try:
+        from setuptools_scm import get_version
+        return get_version(root=str(ROOT))
+    except Exception:
+        pass
+    # Fallback: extract version from git tag directly
+    try:
+        result = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        tag = result.stdout.strip()
+        return tag[1:] if tag.startswith("v") else tag
+    except Exception as e:
+        raise SystemExit(f"Failed to get version from git: {e}")
 
 
 def main() -> None:
@@ -32,22 +45,15 @@ def main() -> None:
     ref_name = args.ref_name.strip()
     tag_version = ref_name[1:] if ref_name.startswith("v") else ref_name
 
-    pyproject_version = _extract(
-        r'^version = "([^"]+)"$', PYPROJECT.read_text(encoding="utf-8"), "pyproject.toml"
-    )
-    script_version = _extract(
-        r'^APP_VERSION = "([^"]+)"$',
-        ZREAD.read_text(encoding="utf-8"),
-        "zread.py",
-    )
+    # Get actual version from setuptools-scm/git
+    actual_version = _get_git_version()
 
     print(f"tag version: {tag_version}")
-    print(f"pyproject version: {pyproject_version}")
-    print(f"zread.py APP_VERSION: {script_version}")
+    print(f"actual version: {actual_version}")
 
-    if tag_version != pyproject_version or tag_version != script_version:
+    if tag_version != actual_version:
         raise SystemExit(
-            "Version mismatch: tag, pyproject.toml, and zread.py must be identical"
+            f"Version mismatch: tag {tag_version} != actual version {actual_version}"
         )
 
 
