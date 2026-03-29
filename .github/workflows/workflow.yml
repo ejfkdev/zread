@@ -29,7 +29,10 @@ jobs:
       - name: Resolve release metadata
         id: meta
         run: |
-          echo "ref_name=${{ github.event.release.tag_name || inputs.ref_name }}" >> "$GITHUB_OUTPUT"
+          REF_NAME="${{ github.event.release.tag_name || inputs.ref_name }}"
+          echo "ref_name=${REF_NAME}" >> "$GITHUB_OUTPUT"
+          VERSION="${REF_NAME#v}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,7 +47,7 @@ jobs:
 
       - name: Build distributions
         env:
-          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.meta.outputs.ref_name }}
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ steps.meta.outputs.version }}
         run: python -m build
 
       - name: Check distributions
