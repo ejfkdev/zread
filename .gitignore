@@ -420,3 +420,6 @@ test-export/
 # Python version file
 .python-version
 __pycache__
+
+# setuptools-scm generated version file
+zread/_version.py
