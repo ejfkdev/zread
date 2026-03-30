@@ -27,13 +27,11 @@ keywords = ["mcp", "context-protocol", "github", "ai", "zread"]
 requires = ["setuptools>=61.0", "setuptools-scm>=8.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["zread*"]
-exclude = ["scripts*"]
+[tool.setuptools]
+py-modules = ["zread"]
 
 [tool.setuptools_scm]
-write_to = "zread/_version.py"
+write_to = "zread_version.py"
 local_scheme = "no-local-version"
 
 [project.scripts]

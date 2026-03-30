@@ -103,7 +103,7 @@ try:
     APP_VERSION = version("zread")
 except PackageNotFoundError:
     try:
-        from zread._version import __version__ as APP_VERSION
+        from zread_version import __version__ as APP_VERSION
     except (ImportError, ModuleNotFoundError):
         APP_VERSION = "0.0.0"
 

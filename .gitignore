@@ -422,4 +422,4 @@ test-export/
 __pycache__
 
 # setuptools-scm generated version file
-zread/_version.py
+zread_version.py
