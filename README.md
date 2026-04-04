@@ -298,8 +298,8 @@ AI Q&A requires a free JWT token from your Zread.ai account:
 You can also configure zread using a config file. The priority is: **CLI arguments > Environment variables > Config file**.
 
 **Config file locations:**
-- macOS: `~/.zread/zread.toml`
-- Linux: `~/.config/zread/zread.toml` (or `$XDG_CONFIG_HOME/zread/zread.toml`)
+- macOS: `~/.config/zread/zread.toml`
+- Linux: `$XDG_CONFIG_HOME/zread/zread.toml` (if set) or `~/.config/zread/zread.toml`
 - Windows: `%APPDATA%\zread\zread.toml`
 
 **Config file format (TOML):**

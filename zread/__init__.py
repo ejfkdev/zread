@@ -96,35 +96,41 @@ HTTPX_RETRY_STATUS_CODES = {429, 502, 503, 504}
 # ==========================================
 
 # 配置文件路径（跨平台支持）
+_CONFIG_PATH: Optional[Path] = None
 
 
 def _get_config_path() -> Optional[Path]:
     """获取配置文件路径。
 
     优先级：
-    - macOS: ~/.zread/zread.toml
+    - macOS: ~/.config/zread/zread.toml
     - Linux: $XDG_CONFIG_HOME/zread/zread.toml（默认 ~/.config/zread/zread.toml）
     - Windows: %APPDATA%/zread/zread.toml
     """
+    global _CONFIG_PATH
+    if _CONFIG_PATH is not None:
+        return _CONFIG_PATH
+
     home = Path.home()
 
     if sys.platform == "darwin":
-        config_dir = home / ".zread"
+        config_file = home / ".config" / "zread" / "zread.toml"
     elif sys.platform == "win32":
-        config_dir = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "zread"
+        config_file = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "zread" / "zread.toml"
     else:
         # Linux 和其他 POSIX 系统
         xdg_config = os.environ.get("XDG_CONFIG_HOME", "")
         if xdg_config:
-            config_dir = Path(xdg_config) / "zread"
+            config_file = Path(xdg_config) / "zread" / "zread.toml"
         else:
-            config_dir = home / ".config" / "zread"
+            config_file = home / ".config" / "zread" / "zread.toml"
 
-    config_file = config_dir / "zread.toml"
-    return config_file if config_file.exists() else None
+    _CONFIG_PATH = config_file if config_file.exists() else None
+    return _CONFIG_PATH
 
 
-def _load_config_file() -> Dict[str, Any]:
+# 加载配置文件（仅用于获取默认值，不覆盖环境变量）
+def _load_config() -> Dict[str, Any]:
     """从配置文件读取配置（如果存在）。
 
     配置文件格式 (TOML):
@@ -144,25 +150,11 @@ def _load_config_file() -> Dict[str, Any]:
         return {}
 
 
-# 加载配置文件（仅用于获取默认值，不覆盖环境变量）
-_CONFIG_FROM_FILE: Dict[str, Any] = {}
-
-
-def _init_config() -> None:
-    """初始化配置，读取配置文件。"""
-    global _CONFIG_FROM_FILE
-    _CONFIG_FROM_FILE = _load_config_file()
-
-
-# 初始化配置
-_init_config()
+_CONFIG_FROM_FILE: Dict[str, Any] = _load_config()
 
 # 硬编码 token（可选，优先级：命令行参数 > 环境变量 > 配置文件）
 # 使用 --no-token 参数可在无 token 模式下运行，只提供不需要 token 的功能
-_config_token = _CONFIG_FROM_FILE.get("token", "")
-_DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", _config_token)
-# 使用 --no-token 参数可在无 token 模式下运行，只提供不需要 token 的功能
-_DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", "")
+_DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", _CONFIG_FROM_FILE.get("token", ""))
 
 # 固定域名
 BASE_URL = "https://zread.ai"
@@ -3115,7 +3107,7 @@ def _print_help_with_env(ctx: typer.Context) -> None:
     config_path = _get_config_path()
     config_table = Table(show_header=False, box=None, padding=(0, 2))
     if sys.platform == "darwin":
-        config_table.add_row("[cyan]~/.zread/zread.toml[/cyan]", "macOS 配置文件")
+        config_table.add_row("[cyan]~/.config/zread/zread.toml[/cyan]", "macOS 配置文件")
     elif sys.platform == "win32":
         config_table.add_row("[cyan]%APPDATA%\\zread\\zread.toml[/cyan]", "Windows 配置文件")
     else:

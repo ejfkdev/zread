@@ -300,7 +300,7 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 你也可以使用配置文件来配置 zread。优先级为：**命令行参数 > 环境变量 > 配置文件**。
 
 **配置文件路径：**
-- macOS: `~/.zread/zread.toml`
+- macOS: `~/.config/zread/zread.toml`
 - Linux: `~/.config/zread/zread.toml`（或 `$XDG_CONFIG_HOME/zread/zread.toml`）
 - Windows: `%APPDATA%\zread\zread.toml`
 
