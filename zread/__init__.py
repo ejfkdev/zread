@@ -75,6 +75,12 @@ warnings.filterwarnings(
 )
 warnings.filterwarnings("ignore", module="PIL")
 
+# TOML 配置文件读取（Python 3.11+ 内置 tomllib，之前的版本需要 tomli）
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
+
 # 全局图片缓存
 _IMAGE_CACHE: Dict[str, Any] = {}
 _TEXTUAL_IMAGE_CLASS: Any = None
@@ -89,7 +95,72 @@ HTTPX_RETRY_STATUS_CODES = {429, 502, 503, 504}
 # 全局配置
 # ==========================================
 
-# 硬编码 token（可选，优先从环境变量读取）
+# 配置文件路径（跨平台支持）
+
+
+def _get_config_path() -> Optional[Path]:
+    """获取配置文件路径。
+
+    优先级：
+    - macOS: ~/.zread/zread.toml
+    - Linux: $XDG_CONFIG_HOME/zread/zread.toml（默认 ~/.config/zread/zread.toml）
+    - Windows: %APPDATA%/zread/zread.toml
+    """
+    home = Path.home()
+
+    if sys.platform == "darwin":
+        config_dir = home / ".zread"
+    elif sys.platform == "win32":
+        config_dir = Path(os.environ.get("APPDATA", home / "AppData" / "Roaming")) / "zread"
+    else:
+        # Linux 和其他 POSIX 系统
+        xdg_config = os.environ.get("XDG_CONFIG_HOME", "")
+        if xdg_config:
+            config_dir = Path(xdg_config) / "zread"
+        else:
+            config_dir = home / ".config" / "zread"
+
+    config_file = config_dir / "zread.toml"
+    return config_file if config_file.exists() else None
+
+
+def _load_config_file() -> Dict[str, Any]:
+    """从配置文件读取配置（如果存在）。
+
+    配置文件格式 (TOML):
+        [zread]
+        token = "your-token-here"
+        lang = "zh"  # 可选，默认为 "zh"
+    """
+    config_path = _get_config_path()
+    if not config_path:
+        return {}
+
+    try:
+        with open(config_path, "rb") as f:
+            config = tomllib.load(f)
+        return config.get("zread", {}) if isinstance(config, dict) else {}
+    except Exception:
+        return {}
+
+
+# 加载配置文件（仅用于获取默认值，不覆盖环境变量）
+_CONFIG_FROM_FILE: Dict[str, Any] = {}
+
+
+def _init_config() -> None:
+    """初始化配置，读取配置文件。"""
+    global _CONFIG_FROM_FILE
+    _CONFIG_FROM_FILE = _load_config_file()
+
+
+# 初始化配置
+_init_config()
+
+# 硬编码 token（可选，优先级：命令行参数 > 环境变量 > 配置文件）
+# 使用 --no-token 参数可在无 token 模式下运行，只提供不需要 token 的功能
+_config_token = _CONFIG_FROM_FILE.get("token", "")
+_DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", _config_token)
 # 使用 --no-token 参数可在无 token 模式下运行，只提供不需要 token 的功能
 _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", "")
 
@@ -996,7 +1067,7 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
 
 
 def _get_default_lang() -> str:
-    """获取默认语言，优先级：CLI --lang > ZREAD_LANG > 系统locale > en。"""
+    """获取默认语言，优先级：CLI --lang > ZREAD_LANG > 配置文件 > 系统locale > en。"""
     argv = sys.argv[1:]
     for idx, arg in enumerate(argv):
         if arg.startswith("--lang="):
@@ -1011,6 +1082,11 @@ def _get_default_lang() -> str:
     zread_lang = os.environ.get("ZREAD_LANG", "")
     if zread_lang in ("zh", "en"):
         return zread_lang
+
+    # 配置文件优先级低于环境变量
+    config_lang = _CONFIG_FROM_FILE.get("lang", "")
+    if config_lang in ("zh", "en"):
+        return config_lang
 
     return _detect_lang_with_pylocale()
 
@@ -3034,6 +3110,28 @@ def _print_help_with_env(ctx: typer.Context) -> None:
         padding=(1, 2),
     )
     console.print(env_panel)
+
+    # 添加配置文件路径面板
+    config_path = _get_config_path()
+    config_table = Table(show_header=False, box=None, padding=(0, 2))
+    if sys.platform == "darwin":
+        config_table.add_row("[cyan]~/.zread/zread.toml[/cyan]", "macOS 配置文件")
+    elif sys.platform == "win32":
+        config_table.add_row("[cyan]%APPDATA%\\zread\\zread.toml[/cyan]", "Windows 配置文件")
+    else:
+        config_table.add_row("[cyan]~/.config/zread/zread.toml[/cyan]", "Linux 配置文件")
+    if config_path:
+        config_table.add_row("[green]✓[/green]", f"配置文件已找到: {config_path}")
+    else:
+        config_table.add_row("[dim]  [/dim]", "配置文件不存在（可选）")
+
+    config_panel = Panel(
+        config_table,
+        title="[bold cyan]配置文件[/bold cyan]",
+        border_style="blue",
+        padding=(1, 2),
+    )
+    console.print(config_panel)
 
 
 @cli_app.callback(invoke_without_command=True)

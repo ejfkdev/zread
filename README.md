@@ -293,6 +293,23 @@ AI Q&A requires a free JWT token from your Zread.ai account:
 | `ZREAD_TOKEN`  | Free JWT token from your zread.ai account, only required for AI Q&A |
 | `ZREAD_LANG`   | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
 
+## Configuration File
+
+You can also configure zread using a config file. The priority is: **CLI arguments > Environment variables > Config file**.
+
+**Config file locations:**
+- macOS: `~/.zread/zread.toml`
+- Linux: `~/.config/zread/zread.toml` (or `$XDG_CONFIG_HOME/zread/zread.toml`)
+- Windows: `%APPDATA%\zread\zread.toml`
+
+**Config file format (TOML):**
+
+```toml
+[zread]
+token = "your-token-here"
+lang = "zh"  # optional, defaults to "zh"
+```
+
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.

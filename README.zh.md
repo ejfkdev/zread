@@ -295,6 +295,23 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 | `ZREAD_TOKEN` | zread.ai 登录账号的免费 JWT Token，仅 AI 问答功能需要         |
 | `ZREAD_LANG`  | 默认语言 (`zh` / `en`)，优先级低于 `--lang`，高于系统locale   |
 
+## 配置文件
+
+你也可以使用配置文件来配置 zread。优先级为：**命令行参数 > 环境变量 > 配置文件**。
+
+**配置文件路径：**
+- macOS: `~/.zread/zread.toml`
+- Linux: `~/.config/zread/zread.toml`（或 `$XDG_CONFIG_HOME/zread/zread.toml`）
+- Windows: `%APPDATA%\zread\zread.toml`
+
+**配置文件格式（TOML）：**
+
+```toml
+[zread]
+token = "your-token-here"
+lang = "zh"  # 可选，默认为 "zh"
+```
+
 ## 贡献
 
 欢迎贡献！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解如何参与。
