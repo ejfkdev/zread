@@ -44,66 +44,66 @@ Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 
     <td align="center">
       <strong>帮助信息</strong><br>
       <code>zread -h</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/help.png" alt="zread help" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/help.png" alt="zread help" width="100%">
     </td>
     <td align="center">
       <strong>文档目录</strong><br>
       <code>zread ls openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ls.png" alt="zread ls" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ls.png" alt="zread ls" width="100%">
     </td>
     <td align="center">
       <strong>查看文档页</strong><br>
       <code>zread cat openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cat-wiki.png" alt="zread cat wiki" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cat-wiki.png" alt="zread cat wiki" width="100%">
     </td>
     <td align="center">
       <strong>查看 GitHub 文件</strong><br>
       <code>zread cat facebook/react README.md</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cat-github.png" alt="zread cat github" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cat-github.png" alt="zread cat github" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>搜索仓库</strong><br>
       <code>zread find ai sandbox</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/find-repo.png" alt="zread find repo" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/find-repo.png" alt="zread find repo" width="100%">
     </td>
     <td align="center">
       <strong>搜索文档</strong><br>
       <code>zread find openclaw/openclaw gateway</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/find-wiki.png" alt="zread find wiki" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/find-wiki.png" alt="zread find wiki" width="100%">
     </td>
     <td align="center">
       <strong>热门仓库</strong><br>
       <code>zread top</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/top.png" alt="zread top" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/top.png" alt="zread top" width="100%">
     </td>
     <td align="center">
       <strong>随机推荐</strong><br>
       <code>zread rand agent-skills</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/rand.png" alt="zread rand" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/rand.png" alt="zread rand" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>单轮 AI 提问</strong><br>
       <code>zread ai openclaw/openclaw 介绍这个库 简单讲讲</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ai-ask.png" alt="zread ai ask" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ai-ask.png" alt="zread ai ask" width="100%">
     </td>
     <td align="center">
       <strong>交互式 AI 对话</strong><br>
       <code>zread ai openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ai-chat.png" alt="zread ai chat" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ai-chat.png" alt="zread ai chat" width="100%">
     </td>
     <td align="center">
       <strong>导出仓库文档</strong><br>
       <code>zread cp openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cp.png" alt="zread cp" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cp.png" alt="zread cp" width="100%">
     </td>
     <td align="center">
       <strong>MCP HTTP 服务</strong><br>
       <code>zread mcp http :8080</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/mcp-http.png" alt="zread mcp http" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/mcp-http.png" alt="zread mcp http" width="100%">
     </td>
   </tr>
 </table>

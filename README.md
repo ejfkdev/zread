@@ -44,66 +44,66 @@ Zread helps you and your AI understand codebases faster. Skip the manual source 
     <td align="center">
       <strong>Help</strong><br>
       <code>zread -h</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/help.png" alt="zread help" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/help.png" alt="zread help" width="100%">
     </td>
     <td align="center">
       <strong>Documentation Outline</strong><br>
       <code>zread ls openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ls.png" alt="zread ls" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ls.png" alt="zread ls" width="100%">
     </td>
     <td align="center">
       <strong>Read a Doc Page</strong><br>
       <code>zread cat openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cat-wiki.png" alt="zread cat wiki" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cat-wiki.png" alt="zread cat wiki" width="100%">
     </td>
     <td align="center">
       <strong>Read a GitHub File</strong><br>
       <code>zread cat facebook/react README.md</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cat-github.png" alt="zread cat github" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cat-github.png" alt="zread cat github" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Search Repositories</strong><br>
       <code>zread find ai sandbox</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/find-repo.png" alt="zread find repo" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/find-repo.png" alt="zread find repo" width="100%">
     </td>
     <td align="center">
       <strong>Search Documentation</strong><br>
       <code>zread find openclaw/openclaw gateway</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/find-wiki.png" alt="zread find wiki" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/find-wiki.png" alt="zread find wiki" width="100%">
     </td>
     <td align="center">
       <strong>Trending Repos</strong><br>
       <code>zread top</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/top.png" alt="zread top" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/top.png" alt="zread top" width="100%">
     </td>
     <td align="center">
       <strong>Random Recommendation</strong><br>
       <code>zread rand agent-skills</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/rand.png" alt="zread rand" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/rand.png" alt="zread rand" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Single-turn AI Q&A</strong><br>
       <code>zread ai openclaw/openclaw "introduce this project briefly"</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ai-ask.png" alt="zread ai ask" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ai-ask.png" alt="zread ai ask" width="100%">
     </td>
     <td align="center">
       <strong>Interactive AI Chat</strong><br>
       <code>zread ai openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/ai-chat.png" alt="zread ai chat" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ai-chat.png" alt="zread ai chat" width="100%">
     </td>
     <td align="center">
       <strong>Export Repository Docs</strong><br>
       <code>zread cp openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/cp.png" alt="zread cp" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cp.png" alt="zread cp" width="100%">
     </td>
     <td align="center">
       <strong>MCP HTTP Service</strong><br>
       <code>zread mcp http :8080</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/master/image/mcp-http.png" alt="zread mcp http" width="100%">
+      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/mcp-http.png" alt="zread mcp http" width="100%">
     </td>
   </tr>
 </table>
