@@ -3,7 +3,6 @@
 [中文](README.zh.md) | English
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
-[![Version](https://img.shields.io/badge/Version-2.0.3-0A7B83)](https://pypi.org/project/zread/)
 [![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS42MDE1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/ejfkdev/zread)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-green)](https://modelcontextprotocol.io/)
 [![CLI](https://img.shields.io/badge/Interface-CLI-2E8B57)](https://pypi.org/project/zread/)
@@ -260,16 +259,16 @@ Add the following configuration to any MCP-compatible client:
 
 ## MCP Tools
 
-| Tool           | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
-| `read_page`    | Get the content of a specific documentation page                            |
-| `search_docs`  | Search keywords in repository documentation                                 |
-| `read_outline` | Get the repository documentation outline                                    |
-| `discover`     | Discover a recommended repository at random                                 |
-| `trending`     | Get trending repository rankings                                            |
-| `info`         | Get repository information and indexing status                              |
-| `read_file`    | Read source code file contents                                              |
-| `ask`          | Ask the repository AI a question (token required), supports `glm-4.7` and `claude-sonnet-4.5` |
+| Tool              | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| `read_doc`        | Get the content of a specific documentation page                            |
+| `search_wiki`     | Search keywords in repository documentation                                 |
+| `get_doc_outline` | Get the repository documentation outline                                    |
+| `discover_repo`   | Discover a recommended repository at random                                 |
+| `get_trending`    | Get trending repository rankings                                            |
+| `get_repo_info`   | Get repository information and indexing status                              |
+| `read_source_file`| Read source code file contents                                              |
+| `ask_ai`          | Ask the repository AI a question (token required), supports `glm-4.7` and `claude-sonnet-4.5` |
 
 ## Get a Token
 
