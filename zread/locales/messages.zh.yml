@@ -164,3 +164,10 @@ zh:
     token_missing: "📝 未配置 ZREAD_TOKEN。获取方式：访问 https://zread.ai 登录后，按 F12 打开控制台并运行 prompt('复制token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)。"
     sse_started: "启动 SSE 模式：%{url}"
     http_started: "启动 HTTP 模式：%{url}"
+  config:
+    title: "配置文件"
+    macos: "macOS 配置文件"
+    linux: "Linux 配置文件"
+    windows: "Windows 配置文件"
+    found: "配置文件已找到：%{path}"
+    not_found: "配置文件不存在（可选）"

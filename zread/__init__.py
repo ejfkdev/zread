@@ -3107,19 +3107,19 @@ def _print_help_with_env(ctx: typer.Context) -> None:
     config_path = _get_config_path()
     config_table = Table(show_header=False, box=None, padding=(0, 2))
     if sys.platform == "darwin":
-        config_table.add_row("[cyan]~/.config/zread/zread.toml[/cyan]", "macOS 配置文件")
+        config_table.add_row("[cyan]~/.config/zread/zread.toml[/cyan]", tr("config.macos"))
     elif sys.platform == "win32":
-        config_table.add_row("[cyan]%APPDATA%\\zread\\zread.toml[/cyan]", "Windows 配置文件")
+        config_table.add_row("[cyan]%APPDATA%\\zread\\zread.toml[/cyan]", tr("config.windows"))
     else:
-        config_table.add_row("[cyan]~/.config/zread/zread.toml[/cyan]", "Linux 配置文件")
+        config_table.add_row("[cyan]~/.config/zread/zread.toml[/cyan]", tr("config.linux"))
     if config_path:
-        config_table.add_row("[green]✓[/green]", f"配置文件已找到: {config_path}")
+        config_table.add_row("[green]✓[/green]", tr("config.found", path=config_path))
     else:
-        config_table.add_row("[dim]  [/dim]", "配置文件不存在（可选）")
+        config_table.add_row("[dim]  [/dim]", tr("config.not_found"))
 
     config_panel = Panel(
         config_table,
-        title="[bold cyan]配置文件[/bold cyan]",
+        title=f"[bold cyan]{tr('config.title')}[/bold cyan]",
         border_style="blue",
         padding=(1, 2),
     )

@@ -164,3 +164,10 @@ en:
     token_missing: "📝 ZREAD_TOKEN is not configured. To get one, sign in at https://zread.ai, open DevTools with F12, and run prompt('copy token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)."
     sse_started: "Starting SSE mode: %{url}"
     http_started: "Starting HTTP mode: %{url}"
+  config:
+    title: "Config File"
+    macos: "macOS config file"
+    linux: "Linux config file"
+    windows: "Windows config file"
+    found: "Config file found: %{path}"
+    not_found: "Config file not found (optional)"
