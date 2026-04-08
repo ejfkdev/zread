@@ -2712,23 +2712,49 @@ def read_outline(repo: str) -> str:
 
 
 def ask(repo: str, question: str, model: str = "glm-4.7") -> str:
-    """向仓库 AI 助手提问
+    """
+    向仓库 AI 助手提问（AI 调用 AI）
 
-    调用基于仓库文档训练的 AI 助手回答问题。
-    回答中可能包含文件链接和文档链接，可用 read_file() 和 read_page() 获取详情。
+    此工具让当前的 AI 通过 MCP 协议调用另一个专门的仓库 AI 助手来回答问题。
+    被调用的 AI 助手基于仓库文档内容进行分析，并回答你的问题。
+
+    被调用的 AI 助手拥有的工具：
+    - search_docs: 文档搜索，查找指南教程文档中的相关页面
+    - read_page: 获取指定页面的完整文档内容
+    - read_outline: 获取仓库文档的大纲结构
+    - read_file: 读取仓库文件的具体内容
+    - web_search: 网络搜索，使用简洁的关键词检索相关信息
+    - get_repo_structure: 分析并展示代码仓库的目录结构
+
+    如果需要分析特定文件或目录结构，可以在问题中显式要求 AI 使用上述工具进行回复。
+
+    对于仓库代码的复杂需求，应该优先使用此工具，如果有多个问题可并行调用。
+    适用于理解项目架构、使用方法、代码示例等复杂问题。
+    支持的 AI 模型: glm-4.7 (默认), claude-sonnet-4.5
+
+    返回的 Markdown 回答内容中可能包含两种链接格式：
+
+        1. **仓库文件链接** - 格式: `[文件名](文件路径#L开始行号-L结束行号)`
+        例如: `[index.ts](index.ts#L1-L28)` `[package.json](package.json#L1-L77)`
+        这类链接指向仓库内的源代码文件，可提取文件路径和行号范围，
+        使用 `read_file(repo, file_path, start_line, end_line)` 获取具体内容。
+
+        2. **文档导航链接** - 格式: `[标题](页面slug)`
+        例如: `[概述](1-overview)` `[快速开始](2-quick-start)`
+        这类链接指向文档的其他页面，使用 `read_page(repo, slug)` 获取该页文档内容。
 
     Args:
-        repo: 仓库路径，格式: owner/repo
-        question: 问题内容
-        model: AI 模型，可选 "glm-4.7"(默认) 或 "claude-sonnet-4.5"
+        repo: 仓库路径，格式: owner/repo 或完整 URL
+        question: 要向 AI 提问的问题，如 "这个项目是做什么的？"
+        model: AI 模型选择，默认 "glm-4.7"，可选 "claude-sonnet-4.5"
 
     Returns:
-        纯文本 AI 回答内容
+        AI 助手的回答内容
 
-    Examples:
-        ask("golang/go", "channel 和 mutex 怎么选择？")
-        ask("reactjs/react", "useEffect 的依赖项原理")
-        ask("rust-lang/rust", "所有权规则详解", model="claude-sonnet-4.5")
+    Example:
+        ask("openclaw/openclaw", "如何安装这个项目？")
+        ask("openclaw/openclaw", "这个项目的登录鉴权逻辑是怎么处理的？")
+        ask("openclaw/openclaw", "请使用 get_repo_structure 工具分析项目目录结构")
     """
     return _chat_with_repo_ai(repo, question, model=model, lang=_DEFAULT_LANG)
 
