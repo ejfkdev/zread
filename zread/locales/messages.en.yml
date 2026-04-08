@@ -66,7 +66,22 @@ en:
     search_failed: "Search failed"
     fetch_trending: "Unable to fetch trending repositories"
     fetch_recommend: "Unable to fetch recommended repositories"
-    ai_requires_token: "Error: the ai command requires ZREAD_TOKEN"
+    ai_requires_token: |
+      Error: the ai command requires ZREAD_TOKEN
+
+      How to get your token (after logging in at https://zread.ai):
+      1. Press F12 to open the browser console
+      2. Run:
+         prompt("copy token", JSON.parse(localStorage.getItem("CGX_AUTH_STORAGE")).state.token)
+      3. Copy the token from the popup dialog
+
+      How to configure (choose one):
+      - Environment variable: export ZREAD_TOKEN='your-token-here'
+      - Config file: ~/.config/zread/zread.toml
+        [zread]
+        token = "your-token-here"
+
+      Or pass directly via command line: zread ai <repo> <question> -t your-token
     create_talk: "Error: unable to create a conversation"
     repo_not_indexed: "Error: this repository has not been indexed by zread yet. An indexing task was submitted in the background. Retry later or run `zread stat %{repo}` first."
     repo_indexing: "Error: this repository is still indexing. Retry later or run `zread stat %{repo}` first."

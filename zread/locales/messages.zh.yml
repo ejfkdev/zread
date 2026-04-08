@@ -66,7 +66,22 @@ zh:
     search_failed: "搜索失败"
     fetch_trending: "无法获取热门仓库"
     fetch_recommend: "无法获取推荐仓库"
-    ai_requires_token: "错误：ai 命令需要 ZREAD_TOKEN"
+    ai_requires_token: |
+      错误：ai 命令需要 ZREAD_TOKEN
+
+      获取 Token（登录 https://zread.ai 后）：
+      1. 按 F12 打开浏览器控制台
+      2. 粘贴运行：
+         prompt("复制token", JSON.parse(localStorage.getItem("CGX_AUTH_STORAGE")).state.token)
+      3. 复制弹窗中的 Token
+
+      配置 Token（任选其一）：
+      - 环境变量：export ZREAD_TOKEN='your-token-here'
+      - 配置文件：~/.config/zread/zread.toml
+        [zread]
+        token = "your-token-here"
+
+      或直接通过命令行传入：zread ai <repo> <question> -t your-token
     create_talk: "错误：无法创建对话"
     repo_not_indexed: "错误：仓库尚未被 zread 收录，已在后台提交索引，请稍后重试或先执行 `zread stat %{repo}` 查看状态"
     repo_indexing: "错误：仓库正在索引中，请稍后重试或先执行 `zread stat %{repo}` 查看状态"
