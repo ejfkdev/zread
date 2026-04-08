@@ -4278,9 +4278,17 @@ def cmd_stat(
         )
 
 
+def _ai_help() -> str:
+    """Get AI command help with dynamic token status."""
+    help_text = tr("cli.commands.ai")
+    if os.environ.get("ZREAD_TOKEN") or _CONFIG_FROM_FILE.get("token"):
+        return help_text.replace(" (token required)", " (token ready)")
+    return help_text
+
+
 @cli_app.command(
     name="ai",
-    help=tr("cli.commands.ai"),
+    help=_ai_help(),
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
 def cmd_ai(
@@ -4316,13 +4324,6 @@ def cmd_ai(
     """
     if not repo:
         typer.echo(ctx.get_help())
-        # 显示 token 配置状态
-        if os.environ.get("ZREAD_TOKEN"):
-            typer.echo(f"\n[green]✓ ZREAD_TOKEN[/green] 已通过环境变量配置")
-        elif _CONFIG_FROM_FILE.get("token"):
-            typer.echo(f"\n[green]✓ Token[/green] 已通过配置文件配置: {_get_config_path()}")
-        else:
-            typer.echo(f"\n[yellow]⚠ Token[/yellow] 未配置，需要设置 ZREAD_TOKEN")
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
     if ctx.args:
