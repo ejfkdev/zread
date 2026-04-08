@@ -2639,16 +2639,16 @@ def _fetch_repo_outline(repo_path: str, lang: str = "zh") -> str:
 # ==========================================
 
 
-def read_page(repo: str, slug: str) -> str:
+def read_doc(repo: str, slug: str) -> str:
     """读取仓库文档页面内容
 
     根据页面 slug 获取该页面的完整 Markdown 文档内容。
 
     页面内容中可能包含两种链接：
     - 仓库文件链接: `[文件名](文件路径#L开始行号-L结束行号)`
-      使用 `read_file(repo, file_path, start_line, end_line)` 获取文件内容
+      使用 `read_source_file(repo, file_path, start_line, end_line)` 获取文件内容
     - 文档导航链接: `[标题](页面slug)`
-      使用 `read_page(repo, slug)` 获取其他页面内容
+      使用 `read_doc(repo, slug)` 获取其他页面内容
 
     Args:
         repo: 仓库路径，格式: owner/repo
@@ -2658,8 +2658,8 @@ def read_page(repo: str, slug: str) -> str:
         页面的 Markdown 格式内容
 
     Examples:
-        read_page("openclaw/openclaw", "1-overview")
-        read_page("vuejs/vue", "guide-introduction")
+        read_doc("openclaw/openclaw", "1-overview")
+        read_doc("vuejs/vue", "guide-introduction")
     """
     result = fetch_markdown(repo, slug, lang=_DEFAULT_LANG)
     if result:
@@ -2667,7 +2667,7 @@ def read_page(repo: str, slug: str) -> str:
     return tr("errors.fetch_page_for_slug_failed", slug=slug)
 
 
-def search_docs(repo: str, query: str) -> str:
+def search_wiki(repo: str, query: str) -> str:
     """在仓库文档中搜索
 
     全文搜索指定仓库的文档内容，返回匹配的页面和内容片段。
@@ -2680,18 +2680,18 @@ def search_docs(repo: str, query: str) -> str:
         纯文本搜索结果，包含页面标题、slug 和内容片段
 
     Examples:
-        search_docs("python/cpython", "GIL")
-        search_docs("reactjs/react", "hooks")
+        search_wiki("python/cpython", "GIL")
+        search_wiki("reactjs/react", "hooks")
     """
     return search_wiki(repo, query, lang=_DEFAULT_LANG)
 
 
-def read_outline(repo: str) -> str:
+def get_doc_outline(repo: str) -> str:
     """读取仓库文档目录结构
 
     获取仓库的完整文档大纲，包含所有页面的标题、slug 和层级关系。
     首次调用会自动提交索引请求。
-    其中 https://zread.ai/owner/repo/{slug} 路径里的 slug 可直接用于 read_page(repo, slug)。
+    其中 https://zread.ai/owner/repo/{slug} 路径里的 slug 可直接用于 read_doc(repo, slug)。
 
     Args:
         repo: 仓库路径，格式: owner/repo
@@ -2700,8 +2700,8 @@ def read_outline(repo: str) -> str:
         纯文本目录结构，包含 wiki 信息和页面列表
 
     Examples:
-        read_outline("golang/go")
-        read_outline("microsoft/vscode")
+        get_doc_outline("golang/go")
+        get_doc_outline("microsoft/vscode")
     """
     return _fetch_repo_outline(repo, lang=_DEFAULT_LANG)
 
@@ -2711,7 +2711,7 @@ def read_outline(repo: str) -> str:
 # ==========================================
 
 
-def ask(repo: str, question: str, model: str = "glm-4.7") -> str:
+def ask_ai(repo: str, question: str, model: str = "glm-4.7") -> str:
     """
     向仓库 AI 助手提问（AI 调用 AI）
 
@@ -2737,11 +2737,11 @@ def ask(repo: str, question: str, model: str = "glm-4.7") -> str:
         1. **仓库文件链接** - 格式: `[文件名](文件路径#L开始行号-L结束行号)`
         例如: `[index.ts](index.ts#L1-L28)` `[package.json](package.json#L1-L77)`
         这类链接指向仓库内的源代码文件，可提取文件路径和行号范围，
-        使用 `read_file(repo, file_path, start_line, end_line)` 获取具体内容。
+        使用 `read_source_file(repo, file_path, start_line, end_line)` 获取具体内容。
 
         2. **文档导航链接** - 格式: `[标题](页面slug)`
         例如: `[概述](1-overview)` `[快速开始](2-quick-start)`
-        这类链接指向文档的其他页面，使用 `read_page(repo, slug)` 获取该页文档内容。
+        这类链接指向文档的其他页面，使用 `read_doc(repo, slug)` 获取该页文档内容。
 
     Args:
         repo: 仓库路径，格式: owner/repo 或完整 URL
@@ -2752,9 +2752,9 @@ def ask(repo: str, question: str, model: str = "glm-4.7") -> str:
         AI 助手的回答内容
 
     Example:
-        ask("openclaw/openclaw", "如何安装这个项目？")
-        ask("openclaw/openclaw", "这个项目的登录鉴权逻辑是怎么处理的？")
-        ask("openclaw/openclaw", "请使用 get_repo_structure 工具分析项目目录结构")
+        ask_ai("openclaw/openclaw", "如何安装这个项目？")
+        ask_ai("openclaw/openclaw", "这个项目的登录鉴权逻辑是怎么处理的？")
+        ask_ai("openclaw/openclaw", "请使用 get_repo_structure 工具分析项目目录结构")
     """
     return _chat_with_repo_ai(repo, question, model=model, lang=_DEFAULT_LANG)
 
@@ -2764,7 +2764,7 @@ def ask(repo: str, question: str, model: str = "glm-4.7") -> str:
 # ==========================================
 
 
-def discover(topic: str = "") -> str:
+def discover_repo(topic: str = "") -> str:
     """发现推荐仓库 (按 GitHub topic 标签筛选)
 
     获取 Zread.ai 推荐的优质代码仓库，可按 GitHub topic 标签筛选。
@@ -2779,10 +2779,10 @@ def discover(topic: str = "") -> str:
         纯文本推荐结果，可能包含 topics 头信息和仓库列表
 
     Examples:
-        discover()
-        discover("python")
-        discover("awesome-list")
-        discover("agent-skills")
+        discover_repo()
+        discover_repo("python")
+        discover_repo("awesome-list")
+        discover_repo("agent-skills")
     """
     result = recommend_repos(topic=topic, lang=_DEFAULT_LANG)
     if result:
@@ -2799,7 +2799,7 @@ def discover(topic: str = "") -> str:
     return tr("errors.fetch_recommend_repo_failed")
 
 
-def find(query: str) -> str:
+def search_repos(query: str) -> str:
     """搜索 GitHub 仓库
 
     根据关键词模糊搜索已索引的代码仓库。
@@ -2811,9 +2811,9 @@ def find(query: str) -> str:
         纯文本仓库列表
 
     Examples:
-        find("axios")
-        find("vue")
-        find("neural network")
+        search_repos("axios")
+        search_repos("vue")
+        search_repos("neural network")
     """
     result = search_repos(query, lang=_DEFAULT_LANG)
     if result:
@@ -2821,7 +2821,7 @@ def find(query: str) -> str:
     return tr("errors.search_repo_failed")
 
 
-def trending(weeks: int = 1) -> str:
+def get_trending(weeks: int = 1) -> str:
     """获取热门仓库榜单
 
     获取 GitHub 热门仓库榜单，按周返回。
@@ -2833,8 +2833,8 @@ def trending(weeks: int = 1) -> str:
         按周分组的纯文本热门仓库榜单
 
     Examples:
-        trending()
-        trending(4)
+        get_trending()
+        get_trending(4)
     """
     result = get_trending_repos(lang=_DEFAULT_LANG)
     if result:
@@ -2842,7 +2842,7 @@ def trending(weeks: int = 1) -> str:
     return tr("errors.fetch_trending_repo_failed")
 
 
-def info(repo: str) -> str:
+def get_repo_info(repo: str) -> str:
     """获取仓库信息
 
     查询指定仓库在 Zread.ai 的索引状态和基本信息。
@@ -2858,8 +2858,8 @@ def info(repo: str) -> str:
         纯文本仓库信息和索引状态
 
     Examples:
-        info("golang/go")
-        info("torvalds/linux")
+        get_repo_info("golang/go")
+        get_repo_info("torvalds/linux")
     """
     result = get_repo_info(repo, lang=_DEFAULT_LANG)
     if result:
@@ -2867,7 +2867,7 @@ def info(repo: str) -> str:
     return tr("errors.fetch_repo_info_failed")
 
 
-def read_file(
+def read_source_file(
     repo: str,
     path: str,
     start_line: Optional[int] = None,
@@ -2887,9 +2887,9 @@ def read_file(
         文件的纯文本内容
 
     Examples:
-        read_file("golang/go", "src/net/http/server.go")
-        read_file("python/cpython", "Lib/http/client.py", start_line=20)
-        read_file("kubernetes/kubernetes", "cmd/kubelet/app/server.go", 200, 250)
+        read_source_file("golang/go", "src/net/http/server.go")
+        read_source_file("python/cpython", "Lib/http/client.py", start_line=20)
+        read_source_file("kubernetes/kubernetes", "cmd/kubelet/app/server.go", 200, 250)
     """
     content = fetch_repo_files(
         repo_path=repo,
@@ -2909,12 +2909,12 @@ def read_file(
 
 def documentation_page_resource(owner: str, repo: str, page_slug: str) -> str:
     """文档页面资源"""
-    return read_page(f"{owner}/{repo}", page_slug)
+    return read_doc(f"{owner}/{repo}", page_slug)
 
 
 def documentation_catalog_resource(owner: str, repo: str) -> str:
     """文档目录资源"""
-    return read_outline(f"{owner}/{repo}")
+    return get_doc_outline(f"{owner}/{repo}")
 
 
 def weekly_trending_resource() -> str:
@@ -3045,25 +3045,25 @@ def _register_tools(mcp: Any, has_token: bool) -> None:
     # ==========================================
 
     # 文档查询工具
-    mcp.tool()(read_page)
-    mcp.tool()(search_docs)
-    mcp.tool()(read_outline)
+    mcp.tool()(read_doc)
+    mcp.tool()(search_wiki)
+    mcp.tool()(get_doc_outline)
 
     # 仓库发现工具
-    mcp.tool()(discover)
-    mcp.tool()(find)
-    mcp.tool()(trending)
-    mcp.tool()(info)
+    mcp.tool()(discover_repo)
+    mcp.tool()(search_repos)
+    mcp.tool()(get_trending)
+    mcp.tool()(get_repo_info)
 
     # 文件获取工具
-    mcp.tool()(read_file)
+    mcp.tool()(read_source_file)
 
     # ==========================================
     # 高级工具（需要 token）
     # ==========================================
     # AI 对话工具 - 仅在 has_token 为 True 时注册
     if has_token:
-        mcp.tool()(ask)
+        mcp.tool()(ask_ai)
 
 
 def _register_resources(mcp: Any) -> None:
