@@ -4316,25 +4316,13 @@ def cmd_ai(
     """
     if not repo:
         typer.echo(ctx.get_help())
-
         # 显示 token 配置状态
-        console = Console(force_terminal=True)
-        token_info = Table(show_header=False, box=None, padding=(0, 2))
         if os.environ.get("ZREAD_TOKEN"):
-            token_info.add_row("[green]✓ ZREAD_TOKEN[/green]", "已通过环境变量配置")
+            typer.echo(f"\n[green]✓ ZREAD_TOKEN[/green] 已通过环境变量配置")
         elif _CONFIG_FROM_FILE.get("token"):
-            token_info.add_row("[green]✓ Token[/green]", f"已通过配置文件配置: {_get_config_path()}")
+            typer.echo(f"\n[green]✓ Token[/green] 已通过配置文件配置: {_get_config_path()}")
         else:
-            token_info.add_row("[yellow]⚠ Token[/yellow]", "未配置，需要设置 ZREAD_TOKEN")
-
-        token_panel = Panel(
-            token_info,
-            title="[bold cyan]Token 状态[/bold cyan]",
-            border_style="blue",
-            padding=(1, 2),
-        )
-        console.print(token_panel)
-
+            typer.echo(f"\n[yellow]⚠ Token[/yellow] 未配置，需要设置 ZREAD_TOKEN")
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
     if ctx.args:
