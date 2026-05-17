@@ -176,7 +176,7 @@ zread rand [topic] [-l zh|en] [-j] [-p]
 # 获取热门仓库榜单
 zread top [weeks] [-l zh|en] [-j] [-p]
 
-# 获取仓库信息
+# 获取仓库信息（会静默提交未收录的仓库、刷新过期文档）
 zread stat <repo> [-l zh|en] [-j] [-p]
 
 # 向仓库 AI 提问（需要登录账号的免费 Token）
@@ -235,7 +235,7 @@ uvx zread stat torvalds/linux
 
 # AI 问答（需要登录账号的免费 Token）
 uvx zread ai golang/go "channel 和 mutex 怎么选择" -t your-token
-uvx zread ai python/cpython --model claude-sonnet-4.5 -t your-token
+uvx zread ai python/cpython --model claude-sonnet-4.6 -t your-token
 uvx zread ai rust-lang/rust            # 进入交互模式
 
 # 导出文档
@@ -270,7 +270,7 @@ uvx zread cp vuejs/vue -c 20                    # 调整并发数
 | `get_trending`   | 热门仓库榜单                                                               |
 | `get_repo_info`  | 获取仓库信息和索引状态                                                     |
 | `read_source_file`| 获取源代码文件内容                                                         |
-| `ask_ai`         | 向仓库 AI 智能问答（需 Token），支持 `glm-4.7` 和 `claude-sonnet-4.5` 模型 |
+| `ask_ai`         | 向仓库 AI 智能问答（需 Token），支持 `glm-5.1` 和 `claude-sonnet-4.6` 模型 |
 
 ## 获取 Token
 
@@ -293,6 +293,7 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 | ------------- | ------------------------------------------------------------- |
 | `ZREAD_TOKEN` | zread.ai 登录账号的免费 JWT Token，仅 AI 问答功能需要         |
 | `ZREAD_LANG`  | 默认语言 (`zh` / `en`)，优先级低于 `--lang`，高于系统locale   |
+| `ZREAD_MODEL` | 默认 AI 模型 (`glm-5.1` / `claude-sonnet-4.6`)，优先级低于 `--model` |
 
 ## 配置文件
 
@@ -309,6 +310,7 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 [zread]
 token = "your-token-here"
 lang = "zh"  # 可选，默认为 "zh"
+model = "glm-5.1"  # 可选，默认为 "glm-5.1"，也支持 "claude-sonnet-4.6"
 ```
 
 ## 贡献

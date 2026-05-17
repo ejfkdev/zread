@@ -175,7 +175,7 @@ zread rand [topic] [-l zh|en] [-j] [-p]
 # Show trending repositories
 zread top [weeks] [-l zh|en] [-j] [-p]
 
-# Show repository status and metadata
+# Show repository status and metadata (silently submits unindexed repos and refreshes stale docs)
 zread stat <repo> [-l zh|en] [-j] [-p]
 
 # Ask the repository AI (requires a free account token)
@@ -233,7 +233,7 @@ uvx zread stat torvalds/linux
 
 # AI Q&A
 uvx zread ai golang/go "How do I choose between channels and mutexes?" -t your-token
-uvx zread ai python/cpython --model claude-sonnet-4.5 -t your-token
+uvx zread ai python/cpython --model claude-sonnet-4.6 -t your-token
 uvx zread ai rust-lang/rust
 
 # Export docs
@@ -268,7 +268,7 @@ Add the following configuration to any MCP-compatible client:
 | `get_trending`    | Get trending repository rankings                                            |
 | `get_repo_info`   | Get repository information and indexing status                              |
 | `read_source_file`| Read source code file contents                                              |
-| `ask_ai`          | Ask the repository AI a question (token required), supports `glm-4.7` and `claude-sonnet-4.5` |
+| `ask_ai`          | Ask the repository AI a question (token required), supports `glm-5.1` and `claude-sonnet-4.6` |
 
 ## Get a Token
 
@@ -291,6 +291,7 @@ AI Q&A requires a free JWT token from your Zread.ai account:
 | -------------- | ------------------------------------------------------------------ |
 | `ZREAD_TOKEN`  | Free JWT token from your zread.ai account, only required for AI Q&A |
 | `ZREAD_LANG`   | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
+| `ZREAD_MODEL`  | Default AI model (`glm-5.1` / `claude-sonnet-4.6`), lower priority than `--model` |
 
 ## Configuration File
 
@@ -307,6 +308,7 @@ You can also configure zread using a config file. The priority is: **CLI argumen
 [zread]
 token = "your-token-here"
 lang = "zh"  # optional, defaults to "zh"
+model = "glm-5.1"  # optional, defaults to "glm-5.1", also supports "claude-sonnet-4.6"
 ```
 
 ## Contributing

@@ -1,9 +1,10 @@
 en:
   cli:
-    app_help: "Zread helps you and your AI understand code better. Skip the source dive and ask directly."
+    app_help: "Zread helps you and your AI understand code better. Skip the source dive and ask directly.\nhttps://github.com/ejfkdev/zread"
     env_vars_title: "Environment Variables"
     env_var_token_desc: "JWT token from your zread.ai account login, only required for AI chat"
     env_var_lang_desc: "Default language (zh/en), lower priority than --lang and higher than system locale"
+    env_var_model_desc: "Default AI model (glm-5.1/claude-sonnet-4.6), lower priority than --model"
     show_version: "Show version"
     show_help: "Show help"
     commands:
@@ -36,7 +37,7 @@ en:
       plain: "Output plain text"
       ai_plain: "Stream only the answer body"
       ai_json: "Return reasoning and answer in one final JSON object"
-      model: "Model: glm-4.7 or claude-sonnet-4.5"
+      model: "Model: glm-5.1 or claude-sonnet-4.6 (default glm-5.1, can be set via ZREAD_MODEL env var or config file)"
       concurrency: "Concurrency (default: 10)"
   status:
     fetch_outline: "Fetching documentation outline..."
@@ -62,6 +63,7 @@ en:
     page_missing_slug: "Error: page %{number} is missing a slug"
     fetch_repo_metadata: "Error: unable to fetch repository metadata"
     fetch_repo_info: "Error: unable to fetch repository information"
+    repo_not_found: "Error: unable to fetch repository information, repository not found"
     fetch_repo_status: "Error: unable to fetch repository status"
     search_failed: "Search failed"
     fetch_trending: "Unable to fetch trending repositories"

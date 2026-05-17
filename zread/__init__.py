@@ -3,17 +3,16 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#   "httpx>=0.25.0",
-#   "fastmcp>=3.0.0",
-#   "typer>=0.9.0",
-#   "arrow>=1.3.0",
+#   "httpx>=0.28.0",
+#   "fastmcp>=3.1.0",
+#   "typer>=0.24.0",
+#   "arrow>=1.4.0",
 #   "darkdetect>=0.8.0",
 #   "python-i18n>=0.3.9",
-#   "pylocale>=0.0.1",
-#   "rich>=13.7.0",
-#   "Pillow>=10.0.0",
-#   "textual-image>=0.2.0",
-#   "typing-extensions>=4.8.0",
+#   "rich>=14.0.0",
+#   "Pillow>=12.0.0",
+#   "textual-image>=0.12.0",
+#   "typing-extensions>=4.15.0",
 # ]
 # ///
 
@@ -137,6 +136,7 @@ def _load_config() -> Dict[str, Any]:
         [zread]
         token = "your-token-here"
         lang = "zh"  # 可选，默认为 "zh"
+        model = "glm-5.1"  # 可选，默认为 "glm-5.1"
     """
     config_path = _get_config_path()
     if not config_path:
@@ -156,6 +156,9 @@ _CONFIG_FROM_FILE: Dict[str, Any] = _load_config()
 # 使用 --no-token 参数可在无 token 模式下运行，只提供不需要 token 的功能
 _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", _CONFIG_FROM_FILE.get("token", ""))
 
+# 默认模型（优先级：环境变量 > 配置文件 > 代码默认值）
+_DEFAULT_MODEL = os.environ.get("ZREAD_MODEL", _CONFIG_FROM_FILE.get("model", "glm-5.1"))
+
 # 固定域名
 BASE_URL = "https://zread.ai"
 APP_NAME = "zread"
@@ -172,6 +175,9 @@ except PackageNotFoundError:
 
 # User-Agent
 USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/efjdkev/zread)"
+
+# 检测是否在交互式终端运行（非交互式自动降级为 plain 模式）
+_IS_INTERACTIVE = sys.stdin.isatty() and sys.stdout.isatty()
 
 # 默认请求头
 DEFAULT_HEADERS = {
@@ -681,7 +687,10 @@ def _format_single_repo_info(
 
         # 2. 收录状态
         if status == "inactive":
-            parts.append("⚠️ 未收录" if lang == "zh" else "⚠️ not indexed")
+            label = "⚠️ 未收录" if lang == "zh" else "⚠️ not indexed"
+            if data.get("_submitted"):
+                label += "（已提交收录请求）" if lang == "zh" else " (submit request sent)"
+            parts.append(label)
         elif status != "success":
             parts.append("⏳ 索引中" if lang == "zh" else "⏳ indexing")
 
@@ -700,6 +709,11 @@ def _format_single_repo_info(
         if parts:
             status_line.append("  |  ".join(parts), style="yellow")
             lines.append(status_line)
+
+        # 刷新提示
+        if data.get("_refreshed"):
+            hint = "🔄 已提交刷新请求" if lang == "zh" else "🔄 refresh request sent"
+            lines.append(Text(hint, style="dim"))
 
     return Text("\n").join(lines)
 
@@ -802,6 +816,10 @@ def _format_status_plain(item: Dict, lang: str) -> str:
         f"status: {item.get('status', 'N/A')}",
         f"stars: {item.get('star_count', 0)}",
     ]
+    if item.get("_submitted"):
+        lines.append("hint: submit indexing request sent" if lang == "en" else "提示：已提交收录请求")
+    elif item.get("_refreshed"):
+        lines.append("hint: refresh indexing request sent" if lang == "en" else "提示：已提交刷新请求")
     return "\n".join(lines)
 
 
@@ -1248,6 +1266,13 @@ def set_default_token(token: str) -> None:
     _DEFAULT_TOKEN = token
 
 
+def _get_model(model: Optional[str] = None) -> str:
+    """获取 AI 模型，优先级：传入参数 > 环境变量 > 配置文件 > 代码默认值。"""
+    if model:
+        return model
+    return _DEFAULT_MODEL
+
+
 def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
     """
     统一解析多种格式的仓库 URL 或路径
@@ -1606,7 +1631,7 @@ async def send_message_async(
     page_id: str,
     repo_id: Optional[str] = None,
     token: Optional[str] = None,
-    model: str = "glm-4.7",
+    model: Optional[str] = None,
     lang: str = "zh",
 ):
     """
@@ -1620,9 +1645,10 @@ async def send_message_async(
     Yields:
         dict: {"event": "answer"|"round_finish", "reasoning_content": str, "text": str}
 
-    :param model: 'glm-4.7' (默认) 或 'claude-sonnet-4.5'
+    :param model: 'glm-5.1' (默认) 或 'claude-sonnet-4.6'，可通过 ZREAD_MODEL 环境变量或配置文件设置
     """
     token = _get_token(token)
+    model = _get_model(model)
     url = f"{BASE_URL}/api/v1/talk/{talk_id}/message"
     headers = {
         **DEFAULT_HEADERS,
@@ -1713,7 +1739,7 @@ async def send_repo_message_async(
     repo_path: str,
     query: str,
     token: Optional[str] = None,
-    model: str = "glm-4.7",
+    model: Optional[str] = None,
     lang: str = "zh",
     wiki_id: Optional[str] = None,
     page_id: Optional[str] = None,
@@ -1736,6 +1762,7 @@ async def send_repo_message_async(
     Yields:
         dict: {"event": "answer"|"round_finish"|"error", "reasoning_content": str, "text": str}
     """
+    model = _get_model(model)
     # 如果缺少上下文，则统一补齐
     if wiki_id is None or repo_id is None or page_id is None:
         wiki_id_value, page_id_value, repo_id_value, error_message = (
@@ -1871,14 +1898,15 @@ def send_message(
     page_id: str,
     repo_id: Optional[str] = None,
     token: Optional[str] = None,
-    model: str = "glm-4.7",
+    model: Optional[str] = None,
     lang: str = "zh",
 ) -> Optional[str]:
     """
     发送消息并获取 AI 回复（同步版本，调用异步版本）
-    :param model: 'glm-4.7' (默认) 或 'claude-sonnet-4.5'
+    :param model: 'glm-5.1' (默认) 或 'claude-sonnet-4.6'，可通过 ZREAD_MODEL 环境变量或配置文件设置
     :return: AI 回复文本（收集所有 round_finish 的内容）
     """
+    model = _get_model(model)
     import asyncio
 
     full_text = []
@@ -1953,7 +1981,7 @@ def chat_with_ai(
     repo_url_or_path: str,
     query: str,
     token: Optional[str] = None,
-    model: str = "glm-4.7",
+    model: Optional[str] = None,
     lang: str = "zh",
 ) -> str:
     """
@@ -1961,11 +1989,12 @@ def chat_with_ai(
     :param repo_url_or_path: 支持多种格式: owner/repo 或完整 URL
     :param query: 用户问题
     :param token: 可选，Bearer Token
-    :param model: 模型，默认 'glm-4.7'
+    :param model: 模型，默认 'glm-5.1'，可通过 ZREAD_MODEL 环境变量或配置文件设置
     :param lang: 语言，默认 'zh'
     :return: AI 回复文本
     """
     token = _get_token(token)
+    model = _get_model(model)
 
     wiki_id, page_id, repo_id, error_message = _get_repo_ai_context(
         repo_url_or_path, lang
@@ -2134,16 +2163,26 @@ def get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, An
 
 
 def submit_repo(
-    name_or_path: str, notification_email: str = "example@zread.ai"
+    name_or_path: str,
+    notification_email: str = "example@zread.ai",
+    token: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     提交索引
     :param name_or_path: 仓库 URL 或路径（支持 github.com/owner/repo 或 owner/repo）
     :param notification_email: 可选的通知邮箱
+    :param token: 可选，Bearer Token，未配置则静默跳过
     :return: dict 提交结果，或 None
     """
+    token = _get_token(token, required=False)
+    if not token:
+        return None
     url = f"{BASE_URL}/api/v1/public/repo/submit"
-    headers = {**DEFAULT_HEADERS, "Content-Type": "application/json"}
+    headers = {
+        **DEFAULT_HEADERS,
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+    }
     data = {"name_or_path": name_or_path}
     if notification_email:
         data["notification_email"] = notification_email
@@ -2170,19 +2209,17 @@ def submit_repo(
         return None
 
 
-def refresh_repo(repo_id: str, token: Optional[str] = None) -> bool:
+def refresh_repo(repo_id: str) -> bool:
     """
     请求刷新索引
     :param repo_id: 仓库 ID
-    :param token: 可选，Bearer Token
     :return: 是否成功
     """
-    token = _get_token(token)
     url = f"{BASE_URL}/api/v1/repo/{repo_id}/refresh"
-    headers = {**DEFAULT_HEADERS, "Authorization": f"Bearer {token}"}
+    headers = {**DEFAULT_HEADERS, "Content-Type": "application/json"}
 
     try:
-        response = httpx.post(url, headers=headers, timeout=30)
+        response = httpx.post(url, headers=headers, json="", timeout=30)
         return response.status_code < 300
     except httpx.RequestError as e:
         print(tr("errors.refresh_repo_network_failed", error=e))
@@ -2530,7 +2567,7 @@ def run_tests():
         print("\n[测试 13/13] 完整 AI 对话 (chat_with_ai)")
         try:
             answer = chat_with_ai(
-                TEST_REPO, "你好，简要介绍一下这个项目", model="glm-4.7"
+                TEST_REPO, "你好，简要介绍一下这个项目", model="glm-5.1"
             )
             if answer and len(answer) > 10:
                 print(f"  ✓ 通过 - 获取到 AI 回复")
@@ -2556,12 +2593,13 @@ def run_tests():
 
 
 def _chat_with_repo_ai(
-    repo_path: str, question: str, model: str = "glm-4.7", lang: str = "zh"
+    repo_path: str, question: str, model: Optional[str] = None, lang: str = "zh"
 ) -> str:
     """
     与仓库 AI 助手对话（内部完整流程）
     流程: 获取仓库元数据 → 创建会话 → 提问 → 删除会话
     """
+    model = _get_model(model)
     wiki_id, page_id, repo_id, error_message = _get_repo_ai_context(repo_path, lang)
     if error_message:
         return (
@@ -2711,7 +2749,7 @@ def get_doc_outline(repo: str) -> str:
 # ==========================================
 
 
-def ask_ai(repo: str, question: str, model: str = "glm-4.7") -> str:
+def ask_ai(repo: str, question: str, model: Optional[str] = None) -> str:
     """
     向仓库 AI 助手提问（AI 调用 AI）
 
@@ -2730,7 +2768,7 @@ def ask_ai(repo: str, question: str, model: str = "glm-4.7") -> str:
 
     对于仓库代码的复杂需求，应该优先使用此工具，如果有多个问题可并行调用。
     适用于理解项目架构、使用方法、代码示例等复杂问题。
-    支持的 AI 模型: glm-4.7 (默认), claude-sonnet-4.5
+    支持的 AI 模型: glm-5.1 (默认), claude-sonnet-4.6
 
     返回的 Markdown 回答内容中可能包含两种链接格式：
 
@@ -2746,7 +2784,7 @@ def ask_ai(repo: str, question: str, model: str = "glm-4.7") -> str:
     Args:
         repo: 仓库路径，格式: owner/repo 或完整 URL
         question: 要向 AI 提问的问题，如 "这个项目是做什么的？"
-        model: AI 模型选择，默认 "glm-4.7"，可选 "claude-sonnet-4.5"
+        model: AI 模型选择，默认 "glm-5.1"，可选 "claude-sonnet-4.6"
 
     Returns:
         AI 助手的回答内容
@@ -3120,6 +3158,7 @@ def _print_help_with_env(ctx: typer.Context) -> None:
     env_table = Table(show_header=False, box=None, padding=(0, 2))
     env_table.add_row("[green]ZREAD_TOKEN[/green]", tr("cli.env_var_token_desc"))
     env_table.add_row("[green]ZREAD_LANG[/green]", tr("cli.env_var_lang_desc"))
+    env_table.add_row("[green]ZREAD_MODEL[/green]", tr("cli.env_var_model_desc"))
 
     env_panel = Panel(
         env_table,
@@ -3285,7 +3324,7 @@ def cmd_get_outline(
     ] = False,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
 ) -> None:
     """获取文档目录结构
 
@@ -3354,7 +3393,7 @@ def cmd_cat(
     ] = False,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
 ) -> None:
     """查看仓库内容（支持 zread 文档或 GitHub 文件）
 
@@ -3939,7 +3978,7 @@ def cmd_find(
     ] = False,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
 ) -> None:
     """搜索仓库或文档关键词
 
@@ -4069,7 +4108,7 @@ def cmd_top(
     ] = False,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
 ) -> None:
     """获取热门仓库榜单
 
@@ -4116,7 +4155,7 @@ def cmd_rand(
     ] = False,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
 ) -> None:
     """随机发现推荐仓库
 
@@ -4161,13 +4200,16 @@ def cmd_rand(
 
 
 def _background_submit_repo(repo_path: str) -> None:
-    """后台异步提交仓库索引（不阻塞主流程）"""
+    """后台异步提交仓库索引（不阻塞主流程，需要 token，静默失败）"""
 
     def _submit():
         try:
-            submit_repo(repo_path)
+            token = _get_token(required=False)
+            if not token:
+                return
+            submit_repo(repo_path, token=token)
         except Exception:
-            pass  # 后台任务不抛出错误
+            pass
 
     threading.Thread(target=_submit, daemon=True).start()
 
@@ -4208,6 +4250,9 @@ def fetch_repo_metadata(repo_url_or_path: str) -> Optional[Dict[str, Any]]:
         response.raise_for_status()
         result = response.json()
         if result.get("code") != 0:
+            msg = result.get("msg", "")
+            if "not found" in msg.lower():
+                return {"_error": "not_found"}
             return None
         data = result.get("data", {})
 
@@ -4219,11 +4264,13 @@ def fetch_repo_metadata(repo_url_or_path: str) -> Optional[Dict[str, Any]]:
         if status == "inactive":
             # 仓库未收录，后台提交索引
             _background_submit_repo(repo_path)
+            data["_submitted"] = True
         elif status == "success" and repo_id and updated_at:
             # 已收录，检查是否超过5天未更新
             days_since_update = (time.time() - updated_at) / (24 * 3600)
             if days_since_update > 5:
                 _background_refresh_repo(repo_id)
+                data["_refreshed"] = True
 
         return data
     except httpx.RequestError:
@@ -4262,7 +4309,7 @@ def cmd_stat(
     ] = False,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
 ) -> None:
     """显示仓库信息
 
@@ -4287,8 +4334,13 @@ def cmd_stat(
         typer.echo(tr("errors.fetch_repo_info", lang), err=True)
         raise typer.Exit(1)
 
+    if isinstance(data, dict) and data.get("_error") == "not_found":
+        typer.echo(tr("errors.repo_not_found", lang), err=True)
+        raise typer.Exit(1)
+
     if json_output:
-        typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
+        clean_data = {k: v for k, v in data.items() if not k.startswith("_")}
+        typer.echo(json.dumps(clean_data, ensure_ascii=False, indent=2))
     elif plain:
         output = _format_status_plain(data, lang)
         typer.echo(output)
@@ -4331,13 +4383,19 @@ def cmd_ai(
     ] = None,
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.ai_plain"))
-    ] = False,
+    ] = not _IS_INTERACTIVE,
     json_output: Annotated[
         bool, typer.Option("--json", "-j", help=tr("cli.options.ai_json"))
     ] = False,
     model: Annotated[
-        str, typer.Option("--model", "-m", help=tr("cli.options.model"))
-    ] = "glm-4.7",
+        Optional[str],
+        typer.Option(
+            "--model",
+            "-m",
+            help=tr("cli.options.model"),
+            show_default=False,
+        ),
+    ] = None,
 ) -> None:
     """向仓库 AI 提问 (需要 token)
 
@@ -4346,7 +4404,7 @@ def cmd_ai(
         ai golang/go "channel 和 mutex 怎么选择"
         ai python/cpython "GIL 机制和并发优化" --plain
         ai rust-lang/rust "所有权规则" -t your_token
-        ai facebook/react "hooks原理" --model claude-sonnet-4.5
+        ai facebook/react "hooks原理" --model claude-sonnet-4.6
     """
     if not repo:
         typer.echo(ctx.get_help())
@@ -4385,6 +4443,13 @@ def cmd_ai(
             delete_talk(talk_id, _DEFAULT_TOKEN)
         else:
             # 进入交互模式（所有初始化在内部异步进行，立即显示提示）
+            if not _IS_INTERACTIVE:
+                typer.echo(
+                    "Error: interactive mode requires a TTY. "
+                    "Please provide a question: zread ai <repo> <question>",
+                    err=True,
+                )
+                raise typer.Exit(1)
             asyncio.run(_ask_interactive(repo, lang, plain, model, _DEFAULT_TOKEN))
     except KeyboardInterrupt:
         pass
@@ -4397,9 +4462,10 @@ async def _ask_single_turn(
     lang: str,
     plain: bool,
     json_output: bool,
-    model: str = "glm-4.7",
+    model: Optional[str] = None,
 ) -> None:
     """单轮对话"""
+    model = _get_model(model)
     if json_output:
         full_reasoning = []
         full_text = []
@@ -4513,6 +4579,7 @@ async def _ask_interactive(
     repo_path: str, lang: str, plain: bool, model: str, token: str
 ) -> None:
     """交互式多轮对话 - 启动即刻输入，支持双重加载动画"""
+    model = _get_model(model)
     from rich.console import Console
 
     console = Console()
