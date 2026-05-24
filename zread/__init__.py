@@ -2120,7 +2120,7 @@ def get_trending_repos(lang: str = "zh") -> Optional[List[Dict[str, Any]]]:
         return None
 
 
-def get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, Any]]:
+def _get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, Any]]:
     """
     查看仓库信息和状态
     :param owner_or_path: 仓库路径 (owner/repo 格式)
@@ -2241,7 +2241,7 @@ def fetch_repo_files_with_meta(
     # 通过 repo_path 获取 repo_id
     parsed = parse_repo_url(repo_path)
     owner, repo = parsed["owner"], parsed["repo"]
-    repo_info = get_repo_info(f"{owner}/{repo}")
+    repo_info = _get_repo_info(f"{owner}/{repo}")
     if not repo_info:
         print(tr("errors.fetch_repo_info_for_file_failed", repo=repo_path))
         return None
@@ -2510,7 +2510,7 @@ def run_tests():
     # 8. 测试获取仓库信息
     print("\n[测试 8/13] 获取仓库信息 (get_repo_info)")
     try:
-        result = get_repo_info("openclaw/openclaw")
+        result = _get_repo_info("openclaw/openclaw")
         if result:
             print(f"  ✓ 通过 - 获取到仓库信息")
             print(f"    Status: {result.get('status', 'N/A')}")
@@ -2542,7 +2542,7 @@ def run_tests():
         print("\n[测试 11/13] 创建对话 (create_talk)")
         try:
             # 先获取 repo_id
-            repo_info = get_repo_info("openclaw/openclaw")
+            repo_info = _get_repo_info("openclaw/openclaw")
             if repo_info and repo_info.get("repo_id"):
                 talk_id = create_talk()
                 if talk_id:
@@ -2899,7 +2899,7 @@ def get_repo_info(repo: str) -> str:
         get_repo_info("golang/go")
         get_repo_info("torvalds/linux")
     """
-    result = get_repo_info(repo, lang=_DEFAULT_LANG)
+    result = _get_repo_info(repo, lang=_DEFAULT_LANG)
     if result:
         return _format_status_plain(result, _DEFAULT_LANG)
     return tr("errors.fetch_repo_info_failed")
