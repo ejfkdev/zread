@@ -66,7 +66,7 @@ from rich.syntax import Syntax
 from rich.table import Column, Table
 from rich.text import Text
 from rich.tree import Tree
-from typing_extensions import Annotated
+from typing_extensions import Annotated, TypedDict
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings(
@@ -824,7 +824,74 @@ def _format_status_plain(item: Dict, lang: str) -> str:
 
 
 # --- JSON 清洗（MCP 工具用） ---
-def _clean_repo_item(item: Dict, lang: str) -> Dict:
+
+
+class _RepoItem(TypedDict):
+    url: str
+    name: str
+    description: str
+    language: str
+    topics: List[str]
+    stars: int
+
+
+class _RepoInfo(_RepoItem, total=False):
+    status: str
+    repo_id: Optional[str]
+    wiki_id: Optional[str]
+    hint: str
+
+
+class _DiscoverResult(TypedDict, total=False):
+    topics: List[str]
+    repos: List[_RepoItem]
+    error: str
+
+
+class _OutlinePage(TypedDict):
+    slug: str
+    title: str
+
+
+class _DocOutline(TypedDict, total=False):
+    wiki_id: Optional[str]
+    repo_id: Optional[str]
+    pages: List[_OutlinePage]
+    error: str
+
+
+class _WikiSearchItem(TypedDict):
+    title: str
+    slug: str
+    matches: List[str]
+
+
+class _SearchWikiResult(TypedDict, total=False):
+    results: List[_WikiSearchItem]
+    error: str
+
+
+class _SearchReposResult(TypedDict, total=False):
+    repos: List[_RepoItem]
+    error: str
+
+
+class _TrendingGroup(TypedDict, total=False):
+    title: str
+    time_span: Dict[str, str]
+    repos: List[_RepoItem]
+
+
+class _TrendingResult(TypedDict, total=False):
+    groups: List[_TrendingGroup]
+    error: str
+
+
+class _ErrorResult(TypedDict):
+    error: str
+
+
+def _clean_repo_item(item: Dict, lang: str) -> _RepoItem:
     url = item.get("url", f"https://github.com/{item.get('owner')}/{item.get('name')}")
     desc = item.get("description_zh", "") if lang == "zh" else item.get("description", "")
     if not desc:
@@ -839,9 +906,9 @@ def _clean_repo_item(item: Dict, lang: str) -> Dict:
     }
 
 
-def _clean_repo_info(item: Dict) -> Dict:
+def _clean_repo_info(item: Dict) -> _RepoInfo:
     lang = _DEFAULT_LANG
-    result = _clean_repo_item(item, lang)
+    result: _RepoInfo = _clean_repo_item(item, lang)
     result["status"] = item.get("status", "")
     if item.get("repo_id"):
         result["repo_id"] = item["repo_id"]
@@ -854,10 +921,10 @@ def _clean_repo_info(item: Dict) -> Dict:
     return result
 
 
-def _clean_trending(data: List[Dict]) -> List[Dict]:
-    result = []
+def _clean_trending(data: List[Dict]) -> List[_TrendingGroup]:
+    result: List[_TrendingGroup] = []
     for group in data:
-        item = {"title": group.get("title", ""), "repos": [_clean_repo_item(r, _DEFAULT_LANG) for r in group.get("repos", [])]}
+        item: _TrendingGroup = {"title": group.get("title", ""), "repos": [_clean_repo_item(r, _DEFAULT_LANG) for r in group.get("repos", [])]}
         time_span = group.get("time_span")
         if time_span:
             item["time_span"] = time_span
@@ -2787,7 +2854,7 @@ def read_doc(repo: str, slug: str) -> str:
     return tr("errors.fetch_page_for_slug_failed", slug=slug)
 
 
-def search_wiki(repo: str, query: str) -> list:
+def search_wiki(repo: str, query: str) -> _SearchWikiResult:
     """在仓库文档中搜索
 
     全文搜索指定仓库的文档内容，返回匹配的页面和内容片段。
@@ -2797,7 +2864,7 @@ def search_wiki(repo: str, query: str) -> list:
         query: 搜索关键词，如 "install", "config", "API"
 
     Returns:
-        搜索结果列表，每项包含 title, slug 和 matches 片段
+        搜索结果字典，包含 results 列表
 
     Examples:
         search_wiki("python/cpython", "GIL")
@@ -2805,11 +2872,11 @@ def search_wiki(repo: str, query: str) -> list:
     """
     results = _search_wiki_raw(repo, query)
     if results is not None:
-        return results
-    return [{"error": tr("errors.search_failed")}]
+        return {"results": results}
+    return {"error": tr("errors.search_failed")}
 
 
-def get_doc_outline(repo: str) -> dict:
+def get_doc_outline(repo: str) -> _DocOutline:
     """读取仓库文档目录结构
 
     获取仓库的完整文档大纲，包含所有页面的标题、slug 和层级关系。
@@ -2906,7 +2973,7 @@ def ask_ai(repo: str, question: str, model: Optional[str] = None) -> str:
 # ==========================================
 
 
-def discover_repo(topic: str = "") -> dict:
+def discover_repo(topic: str = "") -> _DiscoverResult:
     """发现推荐仓库 (按 GitHub topic 标签筛选)
 
     获取 Zread.ai 推荐的优质代码仓库，可按 GitHub topic 标签筛选。
@@ -2937,7 +3004,7 @@ def discover_repo(topic: str = "") -> dict:
     return {"error": tr("errors.fetch_recommend_repo_failed")}
 
 
-def search_repos(query: str) -> list:
+def search_repos(query: str) -> _SearchReposResult:
     """搜索 GitHub 仓库
 
     根据关键词模糊搜索已索引的代码仓库。
@@ -2946,7 +3013,7 @@ def search_repos(query: str) -> list:
         query: 搜索关键词，如 "react", "http client", "machine learning"
 
     Returns:
-        仓库信息列表
+        搜索结果字典，包含 repos 仓库列表
 
     Examples:
         search_repos("axios")
@@ -2955,11 +3022,11 @@ def search_repos(query: str) -> list:
     """
     result = _search_repos_api(query, lang=_DEFAULT_LANG)
     if result:
-        return [_clean_repo_item(r, _DEFAULT_LANG) for r in result]
-    return [{"error": tr("errors.search_repo_failed")}]
+        return {"repos": [_clean_repo_item(r, _DEFAULT_LANG) for r in result]}
+    return {"error": tr("errors.search_repo_failed")}
 
 
-def get_trending(weeks: int = 1) -> list:
+def get_trending(weeks: int = 1) -> _TrendingResult:
     """获取热门仓库榜单
 
     获取 GitHub 热门仓库榜单，按周返回。
@@ -2968,7 +3035,7 @@ def get_trending(weeks: int = 1) -> list:
         weeks: 返回最近几周的数据，默认 1 周
 
     Returns:
-        按周分组的热门仓库列表
+        热门仓库结果字典，包含 groups 周列表
 
     Examples:
         get_trending()
@@ -2976,11 +3043,11 @@ def get_trending(weeks: int = 1) -> list:
     """
     result = get_trending_repos(lang=_DEFAULT_LANG)
     if result:
-        return _clean_trending(result[:weeks])
-    return [{"error": tr("errors.fetch_trending_repo_failed")}]
+        return {"groups": _clean_trending(result[:weeks])}
+    return {"error": tr("errors.fetch_trending_repo_failed")}
 
 
-def get_repo_info(repo: str) -> dict:
+def get_repo_info(repo: str) -> _RepoInfo:
     """获取仓库信息
 
     查询指定仓库在 Zread.ai 的索引状态和基本信息。
