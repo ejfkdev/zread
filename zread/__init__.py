@@ -823,6 +823,48 @@ def _format_status_plain(item: Dict, lang: str) -> str:
     return "\n".join(lines)
 
 
+# --- JSON 清洗（MCP 工具用） ---
+def _clean_repo_item(item: Dict, lang: str) -> Dict:
+    url = item.get("url", f"https://github.com/{item.get('owner')}/{item.get('name')}")
+    desc = item.get("description_zh", "") if lang == "zh" else item.get("description", "")
+    if not desc:
+        desc = item.get("description", "")
+    return {
+        "url": url,
+        "name": item.get("name", ""),
+        "description": desc.replace("\n", " "),
+        "language": item.get("language", ""),
+        "topics": item.get("topics", []),
+        "stars": item.get("star_count", 0),
+    }
+
+
+def _clean_repo_info(item: Dict) -> Dict:
+    lang = _DEFAULT_LANG
+    result = _clean_repo_item(item, lang)
+    result["status"] = item.get("status", "")
+    if item.get("repo_id"):
+        result["repo_id"] = item["repo_id"]
+    if item.get("wiki_id"):
+        result["wiki_id"] = item["wiki_id"]
+    if item.get("_submitted"):
+        result["hint"] = "submit indexing request sent" if lang == "en" else "已提交收录请求"
+    elif item.get("_refreshed"):
+        result["hint"] = "refresh indexing request sent" if lang == "en" else "已提交刷新请求"
+    return result
+
+
+def _clean_trending(data: List[Dict]) -> List[Dict]:
+    result = []
+    for group in data:
+        item = {"title": group.get("title", ""), "repos": [_clean_repo_item(r, _DEFAULT_LANG) for r in group.get("repos", [])]}
+        time_span = group.get("time_span")
+        if time_span:
+            item["time_span"] = time_span
+        result.append(item)
+    return result
+
+
 # --- Outline 格式化 ---
 def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
     """纯文本格式输出大纲"""
@@ -1584,6 +1626,46 @@ def search_wiki(repo_url_or_path: str, query: str, lang: str = "zh") -> str:
         return "no result"
 
 
+def _search_wiki_raw(repo_url_or_path: str, query: str) -> Optional[List[Dict]]:
+    """搜索 Wiki 并返回原始数据（MCP JSON 用）"""
+    status = fetch_repo_metadata(repo_url_or_path)
+    if not status or not status.get("wiki_id"):
+        return None
+
+    wiki_id = status["wiki_id"]
+    search_url = f"{BASE_URL}/api/v1/wiki/{wiki_id}/search"
+
+    headers = {**DEFAULT_HEADERS, "x-locale": _DEFAULT_LANG}
+    params = {"q": query}
+
+    try:
+        response = httpx.get(search_url, headers=headers, params=params, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("code") != 0 or not data.get("data"):
+            return None
+
+        results = data["data"]
+        if not results:
+            return []
+
+        items = []
+        for r in results:
+            matches = []
+            for m in r.get("matches", []):
+                text = m.get("highlight") or m.get("content", "")
+                text = re.sub(r"<[^>]+>", "", text).replace("\n", "  ")
+                text = re.sub(r" {3,}", "  ", text).strip()
+                if text:
+                    matches.append(text)
+            items.append({"title": r.get("title", ""), "slug": r.get("slug", ""), "matches": matches})
+        return items
+
+    except (httpx.RequestError, json.JSONDecodeError):
+        return None
+
+
 def create_talk(token: Optional[str] = None, lang: str = "zh") -> Optional[str]:
     """
     创建 AI 对话
@@ -2059,7 +2141,7 @@ def recommend_repos(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any
         return None
 
 
-def search_repos(query: str, lang: str = "zh") -> Optional[List[Dict[str, Any]]]:
+def _search_repos_api(query: str, lang: str = "zh") -> Optional[List[Dict[str, Any]]]:
     """
     模糊搜索仓库
     :param query: 搜索词
@@ -2482,7 +2564,7 @@ def run_tests():
     # 6. 测试搜索仓库
     print("\n[测试 6/13] 搜索仓库 (search_repos)")
     try:
-        result = search_repos("openclaw")
+        result = _search_repos_api("openclaw")
         if result and len(result) > 0:
             print(f"  ✓ 通过 - 搜索到 {len(result)} 个仓库")
             print(
@@ -2705,7 +2787,7 @@ def read_doc(repo: str, slug: str) -> str:
     return tr("errors.fetch_page_for_slug_failed", slug=slug)
 
 
-def search_wiki(repo: str, query: str) -> str:
+def search_wiki(repo: str, query: str) -> list:
     """在仓库文档中搜索
 
     全文搜索指定仓库的文档内容，返回匹配的页面和内容片段。
@@ -2715,16 +2797,19 @@ def search_wiki(repo: str, query: str) -> str:
         query: 搜索关键词，如 "install", "config", "API"
 
     Returns:
-        纯文本搜索结果，包含页面标题、slug 和内容片段
+        搜索结果列表，每项包含 title, slug 和 matches 片段
 
     Examples:
         search_wiki("python/cpython", "GIL")
         search_wiki("reactjs/react", "hooks")
     """
-    return search_wiki(repo, query, lang=_DEFAULT_LANG)
+    results = _search_wiki_raw(repo, query)
+    if results is not None:
+        return results
+    return [{"error": tr("errors.search_failed")}]
 
 
-def get_doc_outline(repo: str) -> str:
+def get_doc_outline(repo: str) -> dict:
     """读取仓库文档目录结构
 
     获取仓库的完整文档大纲，包含所有页面的标题、slug 和层级关系。
@@ -2735,13 +2820,32 @@ def get_doc_outline(repo: str) -> str:
         repo: 仓库路径，格式: owner/repo
 
     Returns:
-        纯文本目录结构，包含 wiki 信息和页面列表
+        目录结构字典，包含 wiki_id, repo_id 和 pages 页面列表
 
     Examples:
         get_doc_outline("golang/go")
         get_doc_outline("microsoft/vscode")
     """
-    return _fetch_repo_outline(repo, lang=_DEFAULT_LANG)
+    data = fetch_repo_metadata(repo)
+    if not data:
+        return {"error": tr("errors.fetch_repo_info_retry")}
+    unavailable_message = _get_ai_unavailable_message(repo, data)
+    if unavailable_message:
+        return {"error": unavailable_message.replace(tr("errors.error_prefix") + " ", "", 1)}
+
+    repo_id = data.get("repo_id")
+    wiki_id = data.get("wiki_id")
+
+    outline = fetch_repo_outline(repo, lang=_DEFAULT_LANG)
+    if not outline:
+        return {"error": tr("errors.fetch_repo_outline_failed")}
+
+    pages = []
+    for p in outline:
+        page = {"slug": p.get("slug", ""), "title": p.get("title", "")}
+        pages.append(page)
+
+    return {"wiki_id": wiki_id, "repo_id": repo_id, "pages": pages}
 
 
 # ==========================================
@@ -2802,7 +2906,7 @@ def ask_ai(repo: str, question: str, model: Optional[str] = None) -> str:
 # ==========================================
 
 
-def discover_repo(topic: str = "") -> str:
+def discover_repo(topic: str = "") -> dict:
     """发现推荐仓库 (按 GitHub topic 标签筛选)
 
     获取 Zread.ai 推荐的优质代码仓库，可按 GitHub topic 标签筛选。
@@ -2814,7 +2918,7 @@ def discover_repo(topic: str = "") -> str:
                       python, rust, machine-learning, javascript
 
     Returns:
-        纯文本推荐结果，可能包含 topics 头信息和仓库列表
+        推荐结果字典，包含 topics 列表和 repos 仓库列表
 
     Examples:
         discover_repo()
@@ -2826,18 +2930,14 @@ def discover_repo(topic: str = "") -> str:
     if result:
         repos = result.get("repos", []) if isinstance(result, dict) else []
         topics = result.get("topics", []) if isinstance(result, dict) else []
-
-        lines = []
-        if topics:
-            lines.append("topics: " + ", ".join(topics))
-            lines.append("")
-        if repos:
-            lines.append(_format_repo_list_plain(repos, _DEFAULT_LANG))
-        return "\n".join(lines).strip()
-    return tr("errors.fetch_recommend_repo_failed")
+        return {
+            "topics": topics,
+            "repos": [_clean_repo_item(r, _DEFAULT_LANG) for r in repos],
+        }
+    return {"error": tr("errors.fetch_recommend_repo_failed")}
 
 
-def search_repos(query: str) -> str:
+def search_repos(query: str) -> list:
     """搜索 GitHub 仓库
 
     根据关键词模糊搜索已索引的代码仓库。
@@ -2846,20 +2946,20 @@ def search_repos(query: str) -> str:
         query: 搜索关键词，如 "react", "http client", "machine learning"
 
     Returns:
-        纯文本仓库列表
+        仓库信息列表
 
     Examples:
         search_repos("axios")
         search_repos("vue")
         search_repos("neural network")
     """
-    result = search_repos(query, lang=_DEFAULT_LANG)
+    result = _search_repos_api(query, lang=_DEFAULT_LANG)
     if result:
-        return _format_repo_list_plain(result, _DEFAULT_LANG)
-    return tr("errors.search_repo_failed")
+        return [_clean_repo_item(r, _DEFAULT_LANG) for r in result]
+    return [{"error": tr("errors.search_repo_failed")}]
 
 
-def get_trending(weeks: int = 1) -> str:
+def get_trending(weeks: int = 1) -> list:
     """获取热门仓库榜单
 
     获取 GitHub 热门仓库榜单，按周返回。
@@ -2868,7 +2968,7 @@ def get_trending(weeks: int = 1) -> str:
         weeks: 返回最近几周的数据，默认 1 周
 
     Returns:
-        按周分组的纯文本热门仓库榜单
+        按周分组的热门仓库列表
 
     Examples:
         get_trending()
@@ -2876,11 +2976,11 @@ def get_trending(weeks: int = 1) -> str:
     """
     result = get_trending_repos(lang=_DEFAULT_LANG)
     if result:
-        return _format_trending_plain(result[:weeks], _DEFAULT_LANG)
-    return tr("errors.fetch_trending_repo_failed")
+        return _clean_trending(result[:weeks])
+    return [{"error": tr("errors.fetch_trending_repo_failed")}]
 
 
-def get_repo_info(repo: str) -> str:
+def get_repo_info(repo: str) -> dict:
     """获取仓库信息
 
     查询指定仓库在 Zread.ai 的索引状态和基本信息。
@@ -2893,7 +2993,7 @@ def get_repo_info(repo: str) -> str:
         repo: 仓库路径，格式: owner/repo
 
     Returns:
-        纯文本仓库信息和索引状态
+        仓库信息字典，包含 url, description, language, topics, status, stars, repo_id, wiki_id 等字段
 
     Examples:
         get_repo_info("golang/go")
@@ -2901,8 +3001,8 @@ def get_repo_info(repo: str) -> str:
     """
     result = _get_repo_info(repo, lang=_DEFAULT_LANG)
     if result:
-        return _format_status_plain(result, _DEFAULT_LANG)
-    return tr("errors.fetch_repo_info_failed")
+        return _clean_repo_info(result)
+    return {"error": tr("errors.fetch_repo_info_failed")}
 
 
 def read_source_file(
