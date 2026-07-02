@@ -25,6 +25,8 @@ import logging
 import locale
 import os
 import re
+import shutil
+import subprocess
 import sys
 import threading
 import time
@@ -3477,6 +3479,235 @@ def cmd_mcp(
     host, port, path = _parse_address(transport, address)
 
     _run_mcp_server(transport, host, port, path, token)
+
+
+# ==========================================
+# install 命令：为 AI 编码智能体配置 zread MCP 服务
+# ==========================================
+
+# 支持的智能体及别名
+_INSTALL_AGENTS = ("claude-code", "codex", "hermes")
+_INSTALL_AGENT_ALIASES = {
+    "claude-code": "claude-code",
+    "claude_code": "claude-code",
+    "claudecode": "claude-code",
+    "claude": "claude-code",
+    "codex": "codex",
+    "hermes": "hermes",
+    "hermes-agent": "hermes",
+    "hermes_agent": "hermes",
+}
+
+
+def _mcp_server_spec(token: Optional[str]) -> Dict[str, Any]:
+    """构造 zread MCP 服务的启动配置（stdio 模式）"""
+    spec: Dict[str, Any] = {"command": "uvx", "args": ["zread", "mcp"]}
+    if token:
+        spec["env"] = {"ZREAD_TOKEN": token}
+    return spec
+
+
+def _claude_code_snippet(token: Optional[str]) -> str:
+    """Claude Code 的 JSON 配置片段（.mcp.json / ~/.claude.json）"""
+    return json.dumps(
+        {"mcpServers": {"zread": _mcp_server_spec(token)}},
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def _claude_code_add_command(token: Optional[str]) -> List[str]:
+    """Claude Code CLI 的注册命令"""
+    cmd = ["claude", "mcp", "add", "--scope", "user"]
+    if token:
+        cmd += ["--env", f"ZREAD_TOKEN={token}"]
+    return cmd + ["zread", "--", "uvx", "zread", "mcp"]
+
+
+def _codex_snippet(token: Optional[str]) -> str:
+    """Codex 的 TOML 配置片段（~/.codex/config.toml）"""
+    lines = [
+        "[mcp_servers.zread]",
+        'command = "uvx"',
+        'args = ["zread", "mcp"]',
+    ]
+    if token:
+        lines += ["", "[mcp_servers.zread.env]", f'ZREAD_TOKEN = "{token}"']
+    return "\n".join(lines)
+
+
+def _codex_add_command(token: Optional[str]) -> List[str]:
+    """Codex CLI 的注册命令"""
+    cmd = ["codex", "mcp", "add"]
+    if token:
+        cmd += ["--env", f"ZREAD_TOKEN={token}"]
+    return cmd + ["zread", "--", "uvx", "zread", "mcp"]
+
+
+def _hermes_snippet(token: Optional[str]) -> str:
+    """Hermes Agent 的 YAML 配置片段（~/.hermes/config.yaml）"""
+    lines = [
+        "mcp_servers:",
+        "  zread:",
+        '    command: "uvx"',
+        '    args: ["zread", "mcp"]',
+    ]
+    if token:
+        lines += ["    env:", f'      ZREAD_TOKEN: "{token}"']
+    return "\n".join(lines)
+
+
+def _mask_token(text: str, token: Optional[str]) -> str:
+    """在展示命令行时隐去 token"""
+    if token:
+        return text.replace(token, "***")
+    return text
+
+
+def _run_install_command(cmd: List[str], token: Optional[str], lang: str) -> None:
+    """执行智能体自带的 mcp add 命令"""
+    display = _mask_token(" ".join(cmd), token)
+    typer.echo(tr("install.running", lang, command=display))
+    result = subprocess.run(cmd)
+    if result.returncode != 0:
+        typer.echo(
+            tr("install.command_failed", lang, code=result.returncode), err=True
+        )
+        raise typer.Exit(1)
+
+
+def _print_manual_config(
+    run_cmd: Optional[List[str]], snippet: str, path: str, lang: str
+) -> None:
+    """打印手动配置说明：可执行命令 + 配置片段"""
+    if run_cmd:
+        typer.echo(f"\n{tr('install.manual_run', lang)}")
+        typer.echo(f"  {' '.join(run_cmd)}")
+        typer.echo(f"\n{tr('install.manual_file', lang, path=path)}")
+    else:
+        typer.echo(f"\n{tr('install.snippet_hint', lang, path=path)}")
+    typer.echo(f"\n{snippet}\n")
+
+
+def _install_hermes(token: Optional[str], lang: str) -> None:
+    """将 zread 写入 Hermes Agent 的 ~/.hermes/config.yaml"""
+    config_path = Path.home() / ".hermes" / "config.yaml"
+    try:
+        import yaml
+    except ImportError:
+        typer.echo(tr("install.yaml_missing", lang), err=True)
+        _print_manual_config(None, _hermes_snippet(token), str(config_path), lang)
+        raise typer.Exit(1)
+
+    config: Dict[str, Any] = {}
+    if config_path.exists():
+        try:
+            loaded = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as e:
+            typer.echo(
+                tr("install.config_parse_failed", lang, path=config_path, error=e),
+                err=True,
+            )
+            _print_manual_config(None, _hermes_snippet(token), str(config_path), lang)
+            raise typer.Exit(1)
+        if isinstance(loaded, dict):
+            config = loaded
+        # 修改前备份原配置（YAML 重写不保留注释）
+        backup_path = config_path.with_suffix(".yaml.bak")
+        shutil.copy2(config_path, backup_path)
+        typer.echo(tr("install.backup_saved", lang, path=backup_path))
+
+    servers = config.setdefault("mcp_servers", {})
+    if not isinstance(servers, dict):
+        servers = {}
+        config["mcp_servers"] = servers
+    servers["zread"] = _mcp_server_spec(token)
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(
+        yaml.safe_dump(config, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    typer.echo(tr("install.written", lang, path=config_path))
+
+
+@cli_app.command(name="install", help=tr("cli.commands.install"))
+def cmd_install(
+    ctx: typer.Context,
+    agent: Annotated[
+        Optional[str], typer.Argument(help=tr("cli.args.agent"))
+    ] = None,
+    token: Annotated[
+        Optional[str], typer.Option("--token", "-t", help=tr("cli.options.token"))
+    ] = None,
+    print_only: Annotated[
+        bool, typer.Option("--print", "-p", help=tr("cli.options.print_only"))
+    ] = False,
+    lang: Annotated[
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
+    ] = None,
+) -> None:
+    """为 AI 编码智能体配置 zread MCP 服务
+
+    支持的智能体:
+        claude-code    Claude Code（使用 claude mcp add）
+        codex          OpenAI Codex CLI（使用 codex mcp add）
+        hermes         Hermes Agent（写入 ~/.hermes/config.yaml）
+
+    示例:
+        install claude-code
+        install codex -t your-token
+        install hermes --print
+    """
+    lang = _resolve_lang(lang)
+    if not agent:
+        typer.echo(ctx.get_help())
+        typer.echo(f"\n❌ {tr('errors.missing_agent', lang)}", err=True)
+        raise typer.Exit(1)
+
+    target = _INSTALL_AGENT_ALIASES.get(agent.strip().lower())
+    if target is None:
+        typer.echo(
+            f"❌ {tr('install.unknown_agent', lang, agent=agent, supported=', '.join(_INSTALL_AGENTS))}",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    token = _get_token(token, required=False)
+
+    if target == "claude-code":
+        run_cmd = _claude_code_add_command(token)
+        snippet = _claude_code_snippet(token)
+        snippet_path = "~/.claude.json (user) / .mcp.json (project)"
+        if print_only or shutil.which("claude") is None:
+            if not print_only:
+                typer.echo(tr("install.cli_not_found", lang, cli="claude"), err=True)
+            _print_manual_config(run_cmd, snippet, snippet_path, lang)
+        else:
+            _run_install_command(run_cmd, token, lang)
+            typer.echo(f"✅ {tr('install.success', lang, agent='Claude Code')}")
+    elif target == "codex":
+        run_cmd = _codex_add_command(token)
+        snippet = _codex_snippet(token)
+        snippet_path = "~/.codex/config.toml"
+        if print_only or shutil.which("codex") is None:
+            if not print_only:
+                typer.echo(tr("install.cli_not_found", lang, cli="codex"), err=True)
+            _print_manual_config(run_cmd, snippet, snippet_path, lang)
+        else:
+            _run_install_command(run_cmd, token, lang)
+            typer.echo(f"✅ {tr('install.success', lang, agent='Codex')}")
+    else:  # hermes
+        if print_only:
+            _print_manual_config(
+                None, _hermes_snippet(token), "~/.hermes/config.yaml", lang
+            )
+        else:
+            _install_hermes(token, lang)
+            typer.echo(f"✅ {tr('install.success', lang, agent='Hermes Agent')}")
+
+    if not token:
+        typer.echo(tr("install.no_token_hint", lang))
 
 
 @cli_app.command(name="ls", help=tr("cli.commands.ls"))

@@ -17,6 +17,7 @@ en:
       stat: "Show repository information"
       ai: "Ask the repository AI a question (token required)"
       cp: "Export repository docs locally and generate llms.txt / llms-full.txt"
+      install: "Configure the zread MCP server for an AI coding agent (Claude Code / Codex / Hermes)"
     args:
       transport: "Transport protocol: stdio / sse / http"
       address: "Address formats: host, host:port, :port, host:port/path, :port/path (default: 127.0.0.1:8708)"
@@ -30,6 +31,7 @@ en:
       topic_optional: "GitHub topic tag such as python, awesome-list, or agent-skills (optional)"
       question_optional: "Question (optional, enters interactive mode when omitted)"
       output_dir: "Output directory (default: current directory)"
+      agent: "Target agent: claude-code / codex / hermes"
     options:
       token: "ZREAD_TOKEN"
       lang: "Language: zh / en"
@@ -39,6 +41,7 @@ en:
       ai_json: "Return reasoning and answer in one final JSON object"
       model: "Model: glm-5.1 or claude-sonnet-4.6 (default glm-5.1, can be set via ZREAD_MODEL env var or config file)"
       concurrency: "Concurrency (default: 10)"
+      print_only: "Print the configuration only, without modifying anything"
   status:
     fetch_outline: "Fetching documentation outline..."
     fetch_page: "Fetching page content..."
@@ -56,6 +59,7 @@ en:
     missing_repo: "Missing required argument: REPO (repository path in owner/repo format)"
     missing_repo_or_url: "Missing required argument: REPO_OR_URL (repository path or GitHub URL)"
     missing_query: "Missing required argument: QUERY (search keyword)"
+    missing_agent: "Missing required argument: AGENT (claude-code / codex / hermes)"
     fetch_outline: "Error: unable to fetch the documentation outline"
     fetch_repo_outline: "Error: unable to fetch the repository outline"
     fetch_page: "Error: unable to fetch the page content"
@@ -161,6 +165,20 @@ en:
     export_llms_file: "📄 llms.txt (index): %{path}"
     export_llms_full_file: "📄 llms-full.txt (full content): %{path}"
     export_failed_pages: "⚠️ Failed pages:"
+  install:
+    unknown_agent: "Unknown agent: %{agent} (supported: %{supported})"
+    running: "Running: %{command}"
+    command_failed: "❌ Command failed (exit code %{code}). Configure it manually with `zread install <agent> --print`."
+    cli_not_found: "⚠️ `%{cli}` CLI not found, configure it manually:"
+    manual_run: "Run this command:"
+    manual_file: "Or add the following to %{path}:"
+    snippet_hint: "Add the following to %{path}:"
+    yaml_missing: "⚠️ PyYAML is not installed, add the configuration manually:"
+    config_parse_failed: "❌ Failed to parse %{path}: %{error}"
+    backup_saved: "📦 Existing config backed up to %{path}"
+    written: "📝 Config updated: %{path}"
+    success: "zread MCP server configured for %{agent}"
+    no_token_hint: "💡 No ZREAD_TOKEN configured: the ask_ai tool will be unavailable. Get a free token at https://zread.ai (see README), then rerun with -t your-token."
   mcp:
     token_enabled: "🔑 ZREAD_TOKEN is configured."
     token_missing: "📝 ZREAD_TOKEN is not configured. To get one, sign in at https://zread.ai, open DevTools with F12, and run prompt('copy token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)."
