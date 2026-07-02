@@ -17,7 +17,7 @@ Zread helps you and your AI understand codebases faster. Skip the manual source 
 **Two roles**:
 
 - 🖥️ **CLI tool** - run directly in your terminal with minimal setup
-- 🔌 **MCP server** - integrate with AI assistants such as Claude and Cline
+- 🔌 **MCP server** - integrate with AI coding agents such as Claude Code, Codex, Hermes Agent, and Cline
 
 **Highlights**:
 
@@ -183,6 +183,9 @@ zread ai <repo> [question] [-l zh|en] [-t token] [-p] [-j] [-m model]
 
 # Export repository docs locally and generate llms.txt / llms-full.txt
 zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
+
+# Configure the zread MCP server for an AI coding agent
+zread install <claude-code|codex|hermes> [-t token] [-p]
 ```
 
 ### Global Options
@@ -240,9 +243,78 @@ uvx zread ai rust-lang/rust
 uvx zread cp golang/go
 uvx zread cp python/cpython -l zh
 uvx zread cp vuejs/vue -c 20
+
+# Configure AI coding agents
+uvx zread install claude-code
+uvx zread install codex -t your-token
+uvx zread install hermes --print
 ```
 
 ## MCP Client Configuration
+
+### One-command setup
+
+The `install` command configures the zread MCP server for popular AI coding agents:
+
+```bash
+uvx zread install claude-code -t your-token   # Claude Code (runs `claude mcp add`)
+uvx zread install codex -t your-token         # OpenAI Codex CLI (runs `codex mcp add`)
+uvx zread install hermes -t your-token        # Hermes Agent (writes ~/.hermes/config.yaml)
+```
+
+The token is optional — without it everything works except the `ask_ai` tool. Add `-p` / `--print` to only print the configuration instead of applying it.
+
+### Claude Code
+
+```bash
+claude mcp add --scope user --env ZREAD_TOKEN=your-token zread -- uvx zread mcp
+```
+
+Or add to `~/.claude.json` (user scope) / `.mcp.json` (project scope):
+
+```json
+{
+  "mcpServers": {
+    "zread": {
+      "command": "uvx",
+      "args": ["zread", "mcp"],
+      "env": { "ZREAD_TOKEN": "your-token" }
+    }
+  }
+}
+```
+
+### Codex
+
+```bash
+codex mcp add --env ZREAD_TOKEN=your-token zread -- uvx zread mcp
+```
+
+Or add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.zread]
+command = "uvx"
+args = ["zread", "mcp"]
+
+[mcp_servers.zread.env]
+ZREAD_TOKEN = "your-token"
+```
+
+### Hermes Agent
+
+Add to `~/.hermes/config.yaml`:
+
+```yaml
+mcp_servers:
+  zread:
+    command: "uvx"
+    args: ["zread", "mcp"]
+    env:
+      ZREAD_TOKEN: "your-token"
+```
+
+### Other MCP clients
 
 Add the following configuration to any MCP-compatible client:
 
@@ -251,7 +323,8 @@ Add the following configuration to any MCP-compatible client:
   "mcpServers": {
     "zread": {
       "command": "uvx",
-      "args": ["--env", "ZREAD_TOKEN=your-token", "zread", "mcp"]
+      "args": ["zread", "mcp"],
+      "env": { "ZREAD_TOKEN": "your-token" }
     }
   }
 }

@@ -17,7 +17,7 @@ Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 
 **双重身份**：
 
 - 🖥️ **CLI 工具** - 直接在终端运行，无需配置
-- 🔌 **MCP 服务器** - 与 Claude、Cline 等 AI 助手集成
+- 🔌 **MCP 服务器** - 与 Claude Code、Codex、Hermes Agent、Cline 等 AI 编码智能体集成
 
 **核心特点**：
 
@@ -185,6 +185,9 @@ zread ai <repo> [question] [-l zh|en] [-t token] [-p] [-j] [-m model]
 
 # 导出仓库文档到本地（CLI 专属，生成 llms.txt 和 llms-full.txt）
 zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
+
+# 为 AI 编码智能体配置 zread MCP 服务
+zread install <claude-code|codex|hermes> [-t token] [-p]
 ```
 
 ### 全局选项
@@ -242,18 +245,88 @@ uvx zread ai rust-lang/rust            # 进入交互模式
 uvx zread cp golang/go                          # 导出到当前目录
 uvx zread cp python/cpython -l zh               # 指定语言
 uvx zread cp vuejs/vue -c 20                    # 调整并发数
+
+# 配置 AI 编码智能体
+uvx zread install claude-code                   # 配置 Claude Code
+uvx zread install codex -t your-token           # 配置 Codex 并携带 token
+uvx zread install hermes --print                # 仅打印 Hermes 配置
 ```
 
 ## MCP 客户端配置
 
-在支持 MCP 的客户端中添加以下配置：
+### 一键配置
+
+`install` 命令可以为常用 AI 编码智能体一键配置 zread MCP 服务：
+
+```bash
+uvx zread install claude-code -t your-token   # Claude Code（执行 `claude mcp add`）
+uvx zread install codex -t your-token         # OpenAI Codex CLI（执行 `codex mcp add`）
+uvx zread install hermes -t your-token        # Hermes Agent（写入 ~/.hermes/config.yaml）
+```
+
+token 为可选项——不提供时除 `ask_ai` 工具外的所有功能均可正常使用。添加 `-p` / `--print` 参数可只打印配置内容而不做任何修改。
+
+### Claude Code
+
+```bash
+claude mcp add --scope user --env ZREAD_TOKEN=your-token zread -- uvx zread mcp
+```
+
+或添加到 `~/.claude.json`（用户级）/ `.mcp.json`（项目级）：
 
 ```json
 {
   "mcpServers": {
     "zread": {
       "command": "uvx",
-      "args": ["--env", "ZREAD_TOKEN=your-token", "zread", "mcp"]
+      "args": ["zread", "mcp"],
+      "env": { "ZREAD_TOKEN": "your-token" }
+    }
+  }
+}
+```
+
+### Codex
+
+```bash
+codex mcp add --env ZREAD_TOKEN=your-token zread -- uvx zread mcp
+```
+
+或添加到 `~/.codex/config.toml`：
+
+```toml
+[mcp_servers.zread]
+command = "uvx"
+args = ["zread", "mcp"]
+
+[mcp_servers.zread.env]
+ZREAD_TOKEN = "your-token"
+```
+
+### Hermes Agent
+
+添加到 `~/.hermes/config.yaml`：
+
+```yaml
+mcp_servers:
+  zread:
+    command: "uvx"
+    args: ["zread", "mcp"]
+    env:
+      ZREAD_TOKEN: "your-token"
+```
+
+### 其他 MCP 客户端
+
+在任意支持 MCP 的客户端中添加以下配置：
+
+```json
+{
+  "mcpServers": {
+    "zread": {
+      "command": "uvx",
+      "args": ["zread", "mcp"],
+      "env": { "ZREAD_TOKEN": "your-token" }
     }
   }
 }
