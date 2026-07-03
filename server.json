@@ -1,9 +1,9 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-  "name": "io.github.ejfkdev/zread",
+  "name": "io.github.valeriikot/zread",
   "description": "Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 zread.ai，AI 驱动的 GitHub 项目文档。",
   "repository": {
-    "url": "https://github.com/ejfkdev/zread",
+    "url": "https://github.com/valeriikot/zread",
     "source": "github"
   },
   "version": "1.0.0",

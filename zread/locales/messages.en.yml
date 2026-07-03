@@ -1,6 +1,6 @@
 en:
   cli:
-    app_help: "Zread helps you and your AI understand code better. Skip the source dive and ask directly.\nhttps://github.com/ejfkdev/zread"
+    app_help: "Zread helps you and your AI understand code better. Skip the source dive and ask directly.\nhttps://github.com/valeriikot/zread"
     env_vars_title: "Environment Variables"
     env_var_token_desc: "JWT token from your zread.ai account login, only required for AI chat"
     env_var_lang_desc: "Default language (zh/en), lower priority than --lang and higher than system locale"

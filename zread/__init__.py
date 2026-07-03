@@ -176,7 +176,7 @@ except PackageNotFoundError:
         APP_VERSION = "0.0.0"
 
 # User-Agent
-USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/efjdkev/zread)"
+USER_AGENT = f"Mozilla/5.0 (compatible; {APP_NAME}/{APP_VERSION}; +https://github.com/valeriikot/zread)"
 
 # 检测是否在交互式终端运行（非交互式自动降级为 plain 模式）
 _IS_INTERACTIVE = sys.stdin.isatty() and sys.stdout.isatty()

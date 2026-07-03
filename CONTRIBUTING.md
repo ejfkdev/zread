@@ -15,7 +15,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/ejfkdev/zread.git
+git clone https://github.com/valeriikot/zread.git
 cd zread
 
 # 创建虚拟环境
@@ -37,7 +37,7 @@ python zread.py --help
 
 ## 报告问题
 
-如果您发现 bug 或有功能建议，请在 [Issues](https://github.com/ejfkdev/zread/issues) 页面提交。
+如果您发现 bug 或有功能建议，请在 [Issues](https://github.com/valeriikot/zread/issues) 页面提交。
 
 ## 许可证
 

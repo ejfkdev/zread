@@ -3,11 +3,11 @@
 [中文](README.zh.md) | English
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS42MDE1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/ejfkdev/zread)
+[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS42MDE1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/valeriikot/zread)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-green)](https://modelcontextprotocol.io/)
 [![CLI](https://img.shields.io/badge/Interface-CLI-2E8B57)](https://pypi.org/project/zread/)
-[![Transport](https://img.shields.io/badge/Transport-stdio%20%7C%20http%20%7C%20sse-6A5ACD)](https://github.com/ejfkdev/zread)
-[![I18N](https://img.shields.io/badge/I18N-zh%20%7C%20en-FF8C00)](https://github.com/ejfkdev/zread)
+[![Transport](https://img.shields.io/badge/Transport-stdio%20%7C%20http%20%7C%20sse-6A5ACD)](https://github.com/valeriikot/zread)
+[![I18N](https://img.shields.io/badge/I18N-zh%20%7C%20en-FF8C00)](https://github.com/valeriikot/zread)
 [![PyPI](https://img.shields.io/badge/PyPI-zread-blue)](https://pypi.org/project/zread/)
 [![Downloads](https://img.shields.io/pypi/dm/zread)](https://pypi.org/project/zread/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -43,66 +43,66 @@ Zread helps you and your AI understand codebases faster. Skip the manual source 
     <td align="center">
       <strong>Help</strong><br>
       <code>zread -h</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/help.png" alt="zread help" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/help.png" alt="zread help" width="100%">
     </td>
     <td align="center">
       <strong>Documentation Outline</strong><br>
       <code>zread ls openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ls.png" alt="zread ls" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/ls.png" alt="zread ls" width="100%">
     </td>
     <td align="center">
       <strong>Read a Doc Page</strong><br>
       <code>zread cat openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cat-wiki.png" alt="zread cat wiki" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/cat-wiki.png" alt="zread cat wiki" width="100%">
     </td>
     <td align="center">
       <strong>Read a GitHub File</strong><br>
       <code>zread cat facebook/react README.md</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cat-github.png" alt="zread cat github" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/cat-github.png" alt="zread cat github" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Search Repositories</strong><br>
       <code>zread find ai sandbox</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/find-repo.png" alt="zread find repo" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/find-repo.png" alt="zread find repo" width="100%">
     </td>
     <td align="center">
       <strong>Search Documentation</strong><br>
       <code>zread find openclaw/openclaw gateway</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/find-wiki.png" alt="zread find wiki" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/find-wiki.png" alt="zread find wiki" width="100%">
     </td>
     <td align="center">
       <strong>Trending Repos</strong><br>
       <code>zread top</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/top.png" alt="zread top" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/top.png" alt="zread top" width="100%">
     </td>
     <td align="center">
       <strong>Random Recommendation</strong><br>
       <code>zread rand agent-skills</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/rand.png" alt="zread rand" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/rand.png" alt="zread rand" width="100%">
     </td>
   </tr>
   <tr>
     <td align="center">
       <strong>Single-turn AI Q&A</strong><br>
       <code>zread ai openclaw/openclaw "introduce this project briefly"</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ai-ask.png" alt="zread ai ask" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/ai-ask.png" alt="zread ai ask" width="100%">
     </td>
     <td align="center">
       <strong>Interactive AI Chat</strong><br>
       <code>zread ai openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/ai-chat.png" alt="zread ai chat" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/ai-chat.png" alt="zread ai chat" width="100%">
     </td>
     <td align="center">
       <strong>Export Repository Docs</strong><br>
       <code>zread cp openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/cp.png" alt="zread cp" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/cp.png" alt="zread cp" width="100%">
     </td>
     <td align="center">
       <strong>MCP HTTP Service</strong><br>
       <code>zread mcp http :8080</code><br><br>
-      <img src="https://raw.githubusercontent.com/ejfkdev/zread/refs/heads/main/image/mcp-http.png" alt="zread mcp http" width="100%">
+      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/mcp-http.png" alt="zread mcp http" width="100%">
     </td>
   </tr>
 </table>
@@ -123,7 +123,7 @@ pipx run zread
 
 ```bash
 # Clone the repository
-git clone https://github.com/ejfkdev/zread.git
+git clone https://github.com/valeriikot/zread.git
 cd zread
 
 # Option 1: run in the project environment with uv
@@ -140,7 +140,7 @@ pip install .
 You can also run it straight from a Git URL without cloning:
 
 ```bash
-uvx --from git+https://github.com/ejfkdev/zread.git zread -h
+uvx --from git+https://github.com/valeriikot/zread.git zread -h
 ```
 
 The whole CLI lives in a single file with inline script metadata ([PEP 723](https://peps.python.org/pep-0723/)), so running the file directly also works: `uv run zread/__init__.py`.
