@@ -42,6 +42,6 @@ local_scheme = "no-local-version"
 zread = "zread:main"
 
 [project.urls]
-Homepage = "https://github.com/ejfkdev/zread"
-Repository = "https://github.com/ejfkdev/zread"
-Issues = "https://github.com/ejfkdev/zread/issues"
+Homepage = "https://github.com/valeriikot/zread"
+Repository = "https://github.com/valeriikot/zread"
+Issues = "https://github.com/valeriikot/zread/issues"
