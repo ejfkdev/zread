@@ -119,6 +119,32 @@ uvx zread
 pipx run zread
 ```
 
+### 从源码安装
+
+```bash
+# 克隆仓库
+git clone https://github.com/ejfkdev/zread.git
+cd zread
+
+# 方式一：使用 uv 在项目环境中运行
+uv sync
+uv run zread -h
+
+# 方式二：安装为全局工具
+uv tool install .          # 或：pipx install .
+
+# 方式三：安装到当前 Python 环境
+pip install .
+```
+
+也可以不克隆仓库，直接从 Git URL 运行：
+
+```bash
+uvx --from git+https://github.com/ejfkdev/zread.git zread -h
+```
+
+整个 CLI 在单个文件中实现，并带有内联脚本元数据（[PEP 723](https://peps.python.org/pep-0723/)），因此直接运行该文件也可以：`uv run zread/__init__.py`。
+
 ### MCP 服务器
 
 ```bash
@@ -344,6 +370,42 @@ mcp_servers:
 | `get_repo_info`  | 获取仓库信息和索引状态                                                     |
 | `read_source_file`| 获取源代码文件内容                                                         |
 | `ask_ai`         | 向仓库 AI 智能问答（需 Token），支持 `glm-5.1` 和 `claude-sonnet-4.6` 模型 |
+
+## 无需 Zread.ai 账号使用
+
+大部分功能不需要注册账号或配置 token，开箱即用：
+
+- **浏览文档** - `zread ls`、`zread cat`
+- **搜索** - `zread find`（搜索仓库和文档）
+- **发现仓库** - `zread top`、`zread rand`、`zread stat`
+- **导出文档** - `zread cp`（含 `llms.txt` / `llms-full.txt`）
+
+唯一需要 token 的功能是 AI 问答：CLI 的 `zread ai` 命令和 MCP 的 `ask_ai` 工具。MCP 服务器在未配置 `ZREAD_TOKEN` 时启动，只是不注册 `ask_ai` 工具，其他工具全部正常可用。
+
+```bash
+# CLI，无需 token
+uvx zread ls golang/go
+uvx zread cat vuejs/vue
+uvx zread find ai sandbox
+
+# MCP 服务器，无需 token
+uvx zread mcp
+```
+
+无 token 的 MCP 客户端配置（`zread install <agent>` 不带 `-t` 参数时生成的配置相同）：
+
+```json
+{
+  "mcpServers": {
+    "zread": {
+      "command": "uvx",
+      "args": ["zread", "mcp"]
+    }
+  }
+}
+```
+
+之后想启用 AI 问答，按下文说明获取免费 token 并通过 `ZREAD_TOKEN` 配置即可。
 
 ## 获取 Token
 
