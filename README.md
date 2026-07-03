@@ -119,6 +119,32 @@ uvx zread
 pipx run zread
 ```
 
+### Install from Source
+
+```bash
+# Clone the repository
+git clone https://github.com/ejfkdev/zread.git
+cd zread
+
+# Option 1: run in the project environment with uv
+uv sync
+uv run zread -h
+
+# Option 2: install as a global tool
+uv tool install .          # or: pipx install .
+
+# Option 3: install into the current Python environment
+pip install .
+```
+
+You can also run it straight from a Git URL without cloning:
+
+```bash
+uvx --from git+https://github.com/ejfkdev/zread.git zread -h
+```
+
+The whole CLI lives in a single file with inline script metadata ([PEP 723](https://peps.python.org/pep-0723/)), so running the file directly also works: `uv run zread/__init__.py`.
+
 ### MCP Server
 
 ```bash
@@ -342,6 +368,42 @@ Add the following configuration to any MCP-compatible client:
 | `get_repo_info`   | Get repository information and indexing status                              |
 | `read_source_file`| Read source code file contents                                              |
 | `ask_ai`          | Ask the repository AI a question (token required), supports `glm-5.1` and `claude-sonnet-4.6` |
+
+## Usage Without a Zread.ai Account
+
+No account or token is needed for most features. Out of the box you can:
+
+- **Browse docs** - `zread ls`, `zread cat`
+- **Search** - `zread find` (repositories and docs)
+- **Discover repos** - `zread top`, `zread rand`, `zread stat`
+- **Export docs** - `zread cp` (including `llms.txt` / `llms-full.txt`)
+
+The only feature that requires a token is AI Q&A: the `zread ai` CLI command and the `ask_ai` MCP tool. When the MCP server starts without `ZREAD_TOKEN`, the `ask_ai` tool is simply not registered and all other tools work as usual.
+
+```bash
+# CLI, no token needed
+uvx zread ls golang/go
+uvx zread cat vuejs/vue
+uvx zread find ai sandbox
+
+# MCP server, no token needed
+uvx zread mcp
+```
+
+Token-free MCP client configuration (`zread install <agent>` without `-t` produces the same):
+
+```json
+{
+  "mcpServers": {
+    "zread": {
+      "command": "uvx",
+      "args": ["zread", "mcp"]
+    }
+  }
+}
+```
+
+To enable AI Q&A later, get a free token as described below and add it via `ZREAD_TOKEN`.
 
 ## Get a Token
 
