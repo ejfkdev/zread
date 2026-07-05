@@ -224,6 +224,7 @@ The CLI supports plain text and JSON output and works well in pipelines:
 | `-j, --json`         | Output as JSON                                                         |
 | `-p, --plain`        | Output plain text                                                      |
 | `-t, --token`        | ZREAD_TOKEN                                                            |
+| `-d, --direct`       | Direct mode: fetch from GitHub only, never contact zread.ai           |
 | `-h, --help`         | Show help                                                              |
 | `-v, --version`      | Show version                                                           |
 
@@ -405,6 +406,57 @@ Token-free MCP client configuration (`zread install <agent>` without `-t` produc
 
 To enable AI Q&A later, get a free token as described below and add it via `ZREAD_TOKEN`.
 
+### Direct mode: no connection to zread.ai at all
+
+Everything above still talks to zread.ai (anonymously). If you don't want zread to contact zread.ai **at all**, use direct mode: all data then comes straight from GitHub (`api.github.com` + `raw.githubusercontent.com`).
+
+```bash
+# Per command
+zread ls golang/go --direct
+zread cat golang/go docs/README.md -d
+zread find golang/go goroutine -d          # greps the repo's markdown docs
+zread stat torvalds/linux -d
+zread cp vuejs/vue -d
+
+# Process-wide via environment variable
+export ZREAD_DIRECT=1
+
+# Or permanently in ~/.config/zread/zread.toml
+# [zread]
+# direct = true
+
+# MCP server in direct mode
+zread mcp --direct
+```
+
+What changes in direct mode:
+
+| Feature | zread.ai mode | Direct mode |
+| --- | --- | --- |
+| `ls` / doc outline | AI-generated wiki pages | the repository's own markdown files (README, `docs/`, …) |
+| `cat` / `read_doc` | AI wiki page content | raw file content from GitHub |
+| `find <repo> <query>` | wiki full-text search | keyword grep across the repo's markdown docs |
+| `find <query>` / `top` / `rand` / `stat` | zread.ai catalog | GitHub search / repos API |
+| `cp` export | wiki export + `llms.txt` | markdown docs export + `llms.txt` |
+| `zread ai` / `ask_ai` MCP tool | zread.ai LLM | **not available** (clear error; MCP doesn't register the tool) |
+
+Direct mode uses GitHub's public API anonymously (60 requests/hour). Set `GITHUB_TOKEN` (or `ZREAD_GITHUB_TOKEN` / `github_token` in the config file) to raise the limit and to read private repositories. Reading file contents (`cat`, `read_doc`, `read_source_file`) doesn't consume API quota at all.
+
+Token-free, zread.ai-free MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "zread": {
+      "command": "uvx",
+      "args": ["zread", "mcp", "--direct"]
+    }
+  }
+}
+```
+
+Related: `ZREAD_BASE_URL` lets you point the non-direct mode at a self-hosted zread-compatible API instead of `https://zread.ai`.
+
 ## Get a Token
 
 AI Q&A requires a free JWT token from your Zread.ai account:
@@ -427,6 +479,9 @@ AI Q&A requires a free JWT token from your Zread.ai account:
 | `ZREAD_TOKEN`  | Free JWT token from your zread.ai account, only required for AI Q&A |
 | `ZREAD_LANG`   | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
 | `ZREAD_MODEL`  | Default AI model (`glm-5.1` / `claude-sonnet-4.6`), lower priority than `--model` |
+| `ZREAD_DIRECT` | `1`/`true` enables direct mode: fetch everything from GitHub, never contact zread.ai |
+| `GITHUB_TOKEN` | Optional GitHub token for direct mode (higher API rate limits, private repos); `ZREAD_GITHUB_TOKEN` takes precedence |
+| `ZREAD_BASE_URL` | Base URL of a self-hosted zread-compatible API (default `https://zread.ai`) |
 
 ## Configuration File
 
@@ -444,6 +499,9 @@ You can also configure zread using a config file. The priority is: **CLI argumen
 token = "your-token-here"
 lang = "zh"  # optional, defaults to "zh"
 model = "glm-5.1"  # optional, defaults to "glm-5.1", also supports "claude-sonnet-4.6"
+direct = false  # optional, true = direct mode (GitHub only, never contact zread.ai)
+github_token = ""  # optional, GitHub token for direct mode
+base_url = "https://zread.ai"  # optional, self-hosted zread-compatible API
 ```
 
 ## Contributing
