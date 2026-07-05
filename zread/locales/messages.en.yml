@@ -44,6 +44,7 @@ en:
       model: "Model: glm-5.1 or claude-sonnet-4.6 (default glm-5.1, can be set via ZREAD_MODEL env var or config file)"
       concurrency: "Concurrency (default: 10)"
       print_only: "Print the configuration only, without modifying anything"
+      mcp_url: "URL of a shared zread MCP server (HTTP mode), e.g. http://zread.internal:8708/mcp — configures the agent to connect there instead of running a local process"
       direct: "Direct mode: fetch everything from GitHub, never contact zread.ai (docs = the repository's own markdown files)"
   status:
     fetch_outline: "Fetching documentation outline..."

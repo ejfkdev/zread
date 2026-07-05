@@ -359,6 +359,68 @@ mcp_servers:
 }
 ```
 
+## 公司级部署（Docker）
+
+无需每位工程师在本机各自运行 `uvx zread mcp`，可以为全公司部署**一个共享的 zread MCP 服务**，让所有 AI 智能体连接它。配置（zread.ai token、直连模式、GitHub token）集中管理，客户端只需要一个 URL。
+
+### 启动服务
+
+```bash
+# 单次运行
+docker build -t zread-mcp .
+docker run -d --name zread-mcp -p 8708:8708 \
+  -e ZREAD_TOKEN=your-token \
+  zread-mcp
+
+# 或使用 compose（推荐）：复制 .env.example 为 .env 并编辑，然后
+docker compose up -d
+```
+
+共享 MCP 端点为 `http://<你的主机>:8708/mcp`（streamable HTTP）。
+
+服务端环境变量（见 `.env.example`）：`ZREAD_TOKEN`（全员可用 `ask_ai`，无需分发 token）、`ZREAD_DIRECT`（公司级直连模式，不访问 zread.ai）、`GITHUB_TOKEN`、`ZREAD_LANG`、`ZREAD_MODEL`、`ZREAD_BASE_URL`。
+
+### 连接智能体
+
+每位工程师执行一条命令，指向共享服务而非本地进程：
+
+```bash
+uvx zread install claude-code --url http://zread.internal:8708/mcp
+uvx zread install hermes      --url http://zread.internal:8708/mcp
+uvx zread install codex       --url http://zread.internal:8708/mcp   # 打印 config.toml 配置片段
+```
+
+等效的手动配置：
+
+```bash
+# Claude Code
+claude mcp add --scope user --transport http zread http://zread.internal:8708/mcp
+```
+
+```toml
+# Codex（~/.codex/config.toml）
+[mcp_servers.zread]
+url = "http://zread.internal:8708/mcp"
+```
+
+```yaml
+# Hermes Agent（~/.hermes/config.yaml）
+mcp_servers:
+  zread:
+    url: "http://zread.internal:8708/mcp"
+```
+
+### 容器内使用 CLI
+
+镜像内置完整 CLI，同一套部署也可当作共享工具箱：
+
+```bash
+docker exec zread-mcp zread ls golang/go -p
+docker run --rm zread-mcp top -p
+```
+
+> 注意：MCP 端点本身没有内置认证，请部署在内网或负责认证/TLS 的反向代理之后。
+
 ## MCP 工具
 
 | 工具              | 说明                                                                       |

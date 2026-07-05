@@ -3974,33 +3974,45 @@ _INSTALL_AGENT_ALIASES = {
 }
 
 
-def _mcp_server_spec(token: Optional[str]) -> Dict[str, Any]:
-    """构造 zread MCP 服务的启动配置（stdio 模式）"""
+def _mcp_server_spec(token: Optional[str], url: Optional[str] = None) -> Dict[str, Any]:
+    """构造 zread MCP 服务的客户端配置
+
+    url 为空：本地 stdio 模式（uvx zread mcp）
+    url 非空：连接共享的 HTTP MCP 服务（如公司统一部署的 Docker 实例）
+    """
+    if url:
+        return {"type": "http", "url": url}
     spec: Dict[str, Any] = {"command": "uvx", "args": ["zread", "mcp"]}
     if token:
         spec["env"] = {"ZREAD_TOKEN": token}
     return spec
 
 
-def _claude_code_snippet(token: Optional[str]) -> str:
+def _claude_code_snippet(token: Optional[str], url: Optional[str] = None) -> str:
     """Claude Code 的 JSON 配置片段（.mcp.json / ~/.claude.json）"""
     return json.dumps(
-        {"mcpServers": {"zread": _mcp_server_spec(token)}},
+        {"mcpServers": {"zread": _mcp_server_spec(token, url)}},
         ensure_ascii=False,
         indent=2,
     )
 
 
-def _claude_code_add_command(token: Optional[str]) -> List[str]:
+def _claude_code_add_command(
+    token: Optional[str], url: Optional[str] = None
+) -> List[str]:
     """Claude Code CLI 的注册命令"""
     cmd = ["claude", "mcp", "add", "--scope", "user"]
+    if url:
+        return cmd + ["--transport", "http", "zread", url]
     if token:
         cmd += ["--env", f"ZREAD_TOKEN={token}"]
     return cmd + ["zread", "--", "uvx", "zread", "mcp"]
 
 
-def _codex_snippet(token: Optional[str]) -> str:
+def _codex_snippet(token: Optional[str], url: Optional[str] = None) -> str:
     """Codex 的 TOML 配置片段（~/.codex/config.toml）"""
+    if url:
+        return "\n".join(["[mcp_servers.zread]", f'url = "{url}"'])
     lines = [
         "[mcp_servers.zread]",
         'command = "uvx"',
@@ -4012,15 +4024,17 @@ def _codex_snippet(token: Optional[str]) -> str:
 
 
 def _codex_add_command(token: Optional[str]) -> List[str]:
-    """Codex CLI 的注册命令"""
+    """Codex CLI 的注册命令（stdio 模式）"""
     cmd = ["codex", "mcp", "add"]
     if token:
         cmd += ["--env", f"ZREAD_TOKEN={token}"]
     return cmd + ["zread", "--", "uvx", "zread", "mcp"]
 
 
-def _hermes_snippet(token: Optional[str]) -> str:
+def _hermes_snippet(token: Optional[str], url: Optional[str] = None) -> str:
     """Hermes Agent 的 YAML 配置片段（~/.hermes/config.yaml）"""
+    if url:
+        return "\n".join(["mcp_servers:", "  zread:", f'    url: "{url}"'])
     lines = [
         "mcp_servers:",
         "  zread:",
@@ -4064,14 +4078,16 @@ def _print_manual_config(
     typer.echo(f"\n{snippet}\n")
 
 
-def _install_hermes(token: Optional[str], lang: str) -> None:
+def _install_hermes(
+    token: Optional[str], lang: str, url: Optional[str] = None
+) -> None:
     """将 zread 写入 Hermes Agent 的 ~/.hermes/config.yaml"""
     config_path = Path.home() / ".hermes" / "config.yaml"
     try:
         import yaml
     except ImportError:
         typer.echo(tr("install.yaml_missing", lang), err=True)
-        _print_manual_config(None, _hermes_snippet(token), str(config_path), lang)
+        _print_manual_config(None, _hermes_snippet(token, url), str(config_path), lang)
         raise typer.Exit(1)
 
     config: Dict[str, Any] = {}
@@ -4083,7 +4099,7 @@ def _install_hermes(token: Optional[str], lang: str) -> None:
                 tr("install.config_parse_failed", lang, path=config_path, error=e),
                 err=True,
             )
-            _print_manual_config(None, _hermes_snippet(token), str(config_path), lang)
+            _print_manual_config(None, _hermes_snippet(token, url), str(config_path), lang)
             raise typer.Exit(1)
         if isinstance(loaded, dict):
             config = loaded
@@ -4096,7 +4112,8 @@ def _install_hermes(token: Optional[str], lang: str) -> None:
     if not isinstance(servers, dict):
         servers = {}
         config["mcp_servers"] = servers
-    servers["zread"] = _mcp_server_spec(token)
+    # Hermes 的远程服务配置只需要 url 字段（无 type）
+    servers["zread"] = {"url": url} if url else _mcp_server_spec(token)
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
@@ -4118,6 +4135,9 @@ def cmd_install(
     print_only: Annotated[
         bool, typer.Option("--print", "-p", help=tr("cli.options.print_only"))
     ] = False,
+    url: Annotated[
+        Optional[str], typer.Option("--url", "-u", help=tr("cli.options.mcp_url"))
+    ] = None,
     lang: Annotated[
         Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
@@ -4129,10 +4149,14 @@ def cmd_install(
         codex          OpenAI Codex CLI（使用 codex mcp add）
         hermes         Hermes Agent（写入 ~/.hermes/config.yaml）
 
+    默认配置本地 stdio 服务（uvx zread mcp）；
+    使用 --url 可指向公司统一部署的共享 HTTP MCP 服务。
+
     示例:
         install claude-code
         install codex -t your-token
         install hermes --print
+        install claude-code --url http://zread.internal:8708/mcp
     """
     lang = _resolve_lang(lang)
     if not agent:
@@ -4151,8 +4175,8 @@ def cmd_install(
     token = _get_token(token, required=False)
 
     if target == "claude-code":
-        run_cmd = _claude_code_add_command(token)
-        snippet = _claude_code_snippet(token)
+        run_cmd = _claude_code_add_command(token, url)
+        snippet = _claude_code_snippet(token, url)
         snippet_path = "~/.claude.json (user) / .mcp.json (project)"
         if print_only or shutil.which("claude") is None:
             if not print_only:
@@ -4162,26 +4186,28 @@ def cmd_install(
             _run_install_command(run_cmd, token, lang)
             typer.echo(f"✅ {tr('install.success', lang, agent='Claude Code')}")
     elif target == "codex":
-        run_cmd = _codex_add_command(token)
-        snippet = _codex_snippet(token)
+        snippet = _codex_snippet(token, url)
         snippet_path = "~/.codex/config.toml"
-        if print_only or shutil.which("codex") is None:
+        if url:
+            # codex mcp add 不支持 URL 服务，输出手动配置
+            _print_manual_config(None, snippet, snippet_path, lang)
+        elif print_only or shutil.which("codex") is None:
             if not print_only:
                 typer.echo(tr("install.cli_not_found", lang, cli="codex"), err=True)
-            _print_manual_config(run_cmd, snippet, snippet_path, lang)
+            _print_manual_config(_codex_add_command(token), snippet, snippet_path, lang)
         else:
-            _run_install_command(run_cmd, token, lang)
+            _run_install_command(_codex_add_command(token), token, lang)
             typer.echo(f"✅ {tr('install.success', lang, agent='Codex')}")
     else:  # hermes
         if print_only:
             _print_manual_config(
-                None, _hermes_snippet(token), "~/.hermes/config.yaml", lang
+                None, _hermes_snippet(token, url), "~/.hermes/config.yaml", lang
             )
         else:
-            _install_hermes(token, lang)
+            _install_hermes(token, lang, url)
             typer.echo(f"✅ {tr('install.success', lang, agent='Hermes Agent')}")
 
-    if not token:
+    if not token and not url:
         typer.echo(tr("install.no_token_hint", lang))
 
 
