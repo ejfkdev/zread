@@ -5,6 +5,8 @@ en:
     env_var_token_desc: "JWT token from your zread.ai account login, only required for AI chat"
     env_var_lang_desc: "Default language (zh/en), lower priority than --lang and higher than system locale"
     env_var_model_desc: "Default AI model (glm-5.1/claude-sonnet-4.6), lower priority than --model"
+    env_var_direct_desc: "Direct mode (1/true): fetch data from GitHub only, never contact zread.ai"
+    env_var_github_token_desc: "Optional GitHub token for direct mode (higher rate limits, private repos)"
     show_version: "Show version"
     show_help: "Show help"
     commands:
@@ -42,6 +44,7 @@ en:
       model: "Model: glm-5.1 or claude-sonnet-4.6 (default glm-5.1, can be set via ZREAD_MODEL env var or config file)"
       concurrency: "Concurrency (default: 10)"
       print_only: "Print the configuration only, without modifying anything"
+      direct: "Direct mode: fetch everything from GitHub, never contact zread.ai (docs = the repository's own markdown files)"
   status:
     fetch_outline: "Fetching documentation outline..."
     fetch_page: "Fetching page content..."
@@ -139,6 +142,9 @@ en:
     fetch_trending_repo_failed: "❌ Failed to fetch trending repositories"
     fetch_repo_info_failed: "❌ Failed to fetch repository information"
     fetch_file_failed_for_path: "❌ Unable to fetch file: %{path}"
+    github_request_failed: "GitHub request failed: %{error}"
+    github_rate_limited: "GitHub API rate limit reached. Set the GITHUB_TOKEN environment variable to raise the limit."
+    ai_direct_mode: "AI Q&A is provided by zread.ai and is not available in direct mode. Run without --direct / ZREAD_DIRECT to use it."
   messages:
     no_results: "No results"
     unknown_error: "Unknown error"
@@ -165,6 +171,7 @@ en:
     export_llms_file: "📄 llms.txt (index): %{path}"
     export_llms_full_file: "📄 llms-full.txt (full content): %{path}"
     export_failed_pages: "⚠️ Failed pages:"
+    direct_trending_title: "GitHub: most starred repos created this week"
   install:
     unknown_agent: "Unknown agent: %{agent} (supported: %{supported})"
     running: "Running: %{command}"
@@ -180,6 +187,7 @@ en:
     success: "zread MCP server configured for %{agent}"
     no_token_hint: "💡 No ZREAD_TOKEN configured: the ask_ai tool will be unavailable. Get a free token at https://zread.ai (see README), then rerun with -t your-token."
   mcp:
+    direct_mode: "🔗 Direct mode: serving data straight from GitHub, zread.ai is not contacted. The ask_ai tool is unavailable."
     token_enabled: "🔑 ZREAD_TOKEN is configured."
     token_missing: "📝 ZREAD_TOKEN is not configured. To get one, sign in at https://zread.ai, open DevTools with F12, and run prompt('copy token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)."
     sse_started: "Starting SSE mode: %{url}"

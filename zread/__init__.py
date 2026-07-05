@@ -161,8 +161,31 @@ _DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", _CONFIG_FROM_FILE.get("token", ""
 # 默认模型（优先级：环境变量 > 配置文件 > 代码默认值）
 _DEFAULT_MODEL = os.environ.get("ZREAD_MODEL", _CONFIG_FROM_FILE.get("model", "glm-5.1"))
 
-# 固定域名
-BASE_URL = "https://zread.ai"
+
+def _parse_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes", "on")
+
+
+# 直连模式：不访问 zread.ai，数据直接来自 GitHub
+# 优先级：--direct 参数 > ZREAD_DIRECT 环境变量 > 配置文件
+_DIRECT_MODE = _parse_bool(
+    os.environ.get("ZREAD_DIRECT", _CONFIG_FROM_FILE.get("direct", False))
+)
+
+# GitHub API Token（可选，仅直连模式使用，用于提升速率限制和访问私有仓库）
+_GITHUB_TOKEN = os.environ.get(
+    "ZREAD_GITHUB_TOKEN",
+    os.environ.get("GITHUB_TOKEN", _CONFIG_FROM_FILE.get("github_token", "")),
+)
+
+# 服务域名（可通过 ZREAD_BASE_URL 指向兼容的自建服务）
+BASE_URL = os.environ.get(
+    "ZREAD_BASE_URL", _CONFIG_FROM_FILE.get("base_url", "https://zread.ai")
+).rstrip("/")
+GITHUB_API_URL = "https://api.github.com"
+GITHUB_RAW_URL = "https://raw.githubusercontent.com"
 APP_NAME = "zread"
 
 # 版本号：从包元数据获取，本地开发时从 _version.py 获取
@@ -960,7 +983,7 @@ def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
         if section not in groups:
             groups[section] = {}
 
-        full_url = f"https://zread.ai/{owner}/{repo_name}/{slug}"
+        full_url = _page_url(owner, repo_name, slug)
 
         if group:
             if group not in groups[section]:
@@ -1023,7 +1046,7 @@ def _format_outline_rich(data: Dict, owner: str, repo_name: str) -> None:
         group = page.get("group", "")
         topic = page.get("topic", "")
         display_title = topic or title
-        full_url = f"https://zread.ai/{owner}/{repo_name}/{slug}"
+        full_url = _page_url(owner, repo_name, slug)
 
         if section not in sections:
             sections[section] = {}
@@ -1108,7 +1131,11 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
         slug_num = _extract_slug_number(slug)
         prefix = f"{slug_num}. " if slug_num else ""
         # 构建页面链接
-        page_url = f"{base_url}/{slug}"
+        if _DIRECT_MODE and repo and "/" in repo:
+            owner_part, name_part = repo.split("/", 1)
+            page_url = _page_url(owner_part, name_part, slug)
+        else:
+            page_url = f"{base_url}/{slug}"
 
         # 内容预览（保留 <em> 标签用于高亮）
         contents = []
@@ -1377,6 +1404,24 @@ def set_default_token(token: str) -> None:
     _DEFAULT_TOKEN = token
 
 
+def set_direct_mode(enabled: bool) -> None:
+    """设置直连模式（运行时修改，--direct 参数使用）"""
+    global _DIRECT_MODE
+    _DIRECT_MODE = enabled
+
+
+def _is_direct() -> bool:
+    """当前是否处于直连模式（不访问 zread.ai）"""
+    return _DIRECT_MODE
+
+
+def _page_url(owner: str, repo_name: str, slug: str) -> str:
+    """构建文档页面链接：zread 文档页 或 直连模式下的 GitHub 文件页"""
+    if _DIRECT_MODE:
+        return f"https://github.com/{owner}/{repo_name}/blob/HEAD/{slug}"
+    return f"{BASE_URL}/{owner}/{repo_name}/{slug}"
+
+
 def _get_model(model: Optional[str] = None) -> str:
     """获取 AI 模型，优先级：传入参数 > 环境变量 > 配置文件 > 代码默认值。"""
     if model:
@@ -1512,6 +1557,9 @@ def fetch_repo_outline(
     :param lang: 语言，可选 "zh" 或 "en"
     :return: pages 列表，失败返回 None
     """
+    if _DIRECT_MODE:
+        return _direct_repo_outline(repo_url_or_path, lang)
+
     zread_url = parse_repo_url(repo_url_or_path)["zread_url"]
 
     # 构建带 X-Locale 的 headers 和 cookies
@@ -1595,6 +1643,9 @@ def fetch_markdown(repo_url_or_path: str, slug: str, lang: str = "zh") -> Option
     :param lang: 语言，默认 'zh'
     :return: Markdown 字符串 或 None
     """
+    if _DIRECT_MODE:
+        return _direct_fetch_markdown(repo_url_or_path, slug, lang)
+
     zread_url = parse_repo_url(repo_url_or_path)["zread_url"]
     url = f"{zread_url}/{slug}"
 
@@ -1697,6 +1748,22 @@ def search_wiki(repo_url_or_path: str, query: str, lang: str = "zh") -> str:
 
 def _search_wiki_raw(repo_url_or_path: str, query: str) -> Optional[List[Dict]]:
     """搜索 Wiki 并返回原始数据（MCP JSON 用）"""
+    if _DIRECT_MODE:
+        results = _direct_search_wiki(repo_url_or_path, query, _DEFAULT_LANG)
+        if results is None:
+            return None
+        return [
+            {
+                "title": r.get("title", ""),
+                "slug": r.get("slug", ""),
+                "matches": [
+                    re.sub(r"<[^>]+>", "", m.get("content", ""))
+                    for m in r.get("matches", [])
+                ],
+            }
+            for r in results
+        ]
+
     status = fetch_repo_metadata(repo_url_or_path)
     if not status or not status.get("wiki_id"):
         return None
@@ -1989,6 +2056,9 @@ def _get_repo_ai_context(
     repo_path: str, lang: str = "zh"
 ) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
     """获取仓库 AI 所需上下文，返回 (wiki_id, page_id, repo_id, error_message)。"""
+    if _DIRECT_MODE:
+        return None, None, None, tr("errors.ai_direct_mode", lang)
+
     metadata = fetch_repo_metadata(repo_path)
     unavailable_message = _get_ai_unavailable_message(
         parse_repo_url(repo_path)["repo_path"], metadata
@@ -2180,6 +2250,9 @@ def recommend_repos(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any
     :param lang: 语言，可选 "zh" 或 "en"
     :return: dict 包含 topics 和 repos，或 None
     """
+    if _DIRECT_MODE:
+        return _direct_recommend(topic, lang)
+
     url = f"{BASE_URL}/api/v1/repo/recommend"
     params = {"topic": topic} if topic else {}
     headers = {**DEFAULT_HEADERS, "X-Locale": lang}
@@ -2217,6 +2290,9 @@ def _search_repos_api(query: str, lang: str = "zh") -> Optional[List[Dict[str, A
     :param lang: 语言，默认 'zh'
     :return: list 仓库列表，或 None
     """
+    if _DIRECT_MODE:
+        return _direct_search_repos(query, lang)
+
     url = f"{BASE_URL}/api/v1/repo"
     params = {"q": query}
     headers = {**DEFAULT_HEADERS, "x-locale": lang}
@@ -2250,6 +2326,9 @@ def get_trending_repos(lang: str = "zh") -> Optional[List[Dict[str, Any]]]:
     :param lang: 语言，可选 "zh" 或 "en"
     :return: list 分组数组，每项包含 title/time_span/repos
     """
+    if _DIRECT_MODE:
+        return _direct_trending(lang)
+
     url = f"{BASE_URL}/api/v1/public/repo/trending"
     headers = {**DEFAULT_HEADERS, "X-Locale": lang}
     cookies = {"X-Locale": lang}
@@ -2281,6 +2360,9 @@ def _get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, A
     # 解析 owner/repo 格式
     if "/" not in owner_or_path:
         raise ValueError(tr("errors.invalid_repo_format"))
+
+    if _DIRECT_MODE:
+        return _direct_repo_metadata(owner_or_path, lang)
 
     parts = owner_or_path.split("/")
     owner = parts[0]
@@ -2325,6 +2407,8 @@ def submit_repo(
     :param token: 可选，Bearer Token，未配置则静默跳过
     :return: dict 提交结果，或 None
     """
+    if _DIRECT_MODE:
+        return None
     token = _get_token(token, required=False)
     if not token:
         return None
@@ -2366,6 +2450,8 @@ def refresh_repo(repo_id: str) -> bool:
     :param repo_id: 仓库 ID
     :return: 是否成功
     """
+    if _DIRECT_MODE:
+        return False
     url = f"{BASE_URL}/api/v1/repo/{repo_id}/refresh"
     headers = {**DEFAULT_HEADERS, "Content-Type": "application/json"}
 
@@ -2389,6 +2475,11 @@ def fetch_repo_files_with_meta(
 
     :return: 包含 content, total_lines, size 等信息的字典，失败返回 None
     """
+    if _DIRECT_MODE:
+        return _direct_fetch_file_meta(
+            repo_path, file_path, start_line, end_line, _DEFAULT_LANG
+        )
+
     # 通过 repo_path 获取 repo_id
     parsed = parse_repo_url(repo_path)
     owner, repo = parsed["owner"], parsed["repo"]
@@ -2548,6 +2639,383 @@ def fetch_repo_files(
         repo_path, file_path, start_line, end_line, token
     )
     return result["content"] if result else None
+
+
+# ==========================================
+# 直连模式：数据直接来自 GitHub，不依赖 zread.ai
+# ==========================================
+
+# 直连模式下作为"文档"的文件扩展名
+_GH_DOC_EXTENSIONS = (".md", ".mdx", ".markdown", ".rst")
+# 大纲最多收录的文档文件数量（防止超大仓库刷屏）
+_GH_DOC_TREE_LIMIT = 500
+# 文档搜索最多下载的文件数量
+_GH_SEARCH_FILE_LIMIT = 30
+
+_GH_REPO_CACHE: Dict[str, Optional[Dict[str, Any]]] = {}
+_GH_TREE_CACHE: Dict[str, Optional[List[str]]] = {}
+
+
+def _gh_headers() -> Dict[str, str]:
+    """GitHub API 请求头（含可选 token）"""
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": USER_AGENT,
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+    if _GITHUB_TOKEN:
+        headers["Authorization"] = f"Bearer {_GITHUB_TOKEN}"
+    return headers
+
+
+def _gh_api_get(
+    path: str, params: Optional[dict] = None, lang: str = "zh"
+) -> Optional[Any]:
+    """请求 GitHub REST API，404 与限流返回 None 并打印提示"""
+    url = f"{GITHUB_API_URL}{path}"
+    try:
+        response = httpx.get(url, headers=_gh_headers(), params=params, timeout=30)
+        if response.status_code == 404:
+            return None
+        if (
+            response.status_code in (403, 429)
+            and response.headers.get("x-ratelimit-remaining") == "0"
+        ):
+            print(tr("errors.github_rate_limited", lang))
+            return None
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPStatusError as e:
+        print(tr("errors.github_request_failed", lang, error=e))
+        return None
+    except httpx.RequestError as e:
+        print(tr("errors.github_request_failed", lang, error=e))
+        return None
+    except json.JSONDecodeError as e:
+        print(tr("errors.github_request_failed", lang, error=e))
+        return None
+
+
+def _gh_fetch_raw(
+    owner: str, repo: str, file_path: str, lang: str = "zh"
+) -> Optional[str]:
+    """从 raw.githubusercontent.com 获取文件内容（HEAD 指向默认分支）
+
+    公开仓库无需认证；先匿名请求，404 时若配置了 token 再携带 token 重试
+    （用于私有仓库），避免把 token 发给不需要它的公开地址。
+    """
+    url = f"{GITHUB_RAW_URL}/{owner}/{repo}/HEAD/{file_path}"
+    try:
+        response = httpx.get(url, headers={"User-Agent": USER_AGENT}, timeout=30)
+        if response.status_code == 404 and _GITHUB_TOKEN:
+            response = httpx.get(
+                url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Authorization": f"Bearer {_GITHUB_TOKEN}",
+                },
+                timeout=30,
+            )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return response.text
+    except httpx.RequestError as e:
+        print(tr("errors.github_request_failed", lang, error=e))
+        return None
+    except httpx.HTTPStatusError as e:
+        print(tr("errors.github_request_failed", lang, error=e))
+        return None
+
+
+def _gh_repo_get(owner: str, repo: str, lang: str = "zh") -> Optional[Dict[str, Any]]:
+    """获取 GitHub 仓库信息（进程内缓存）"""
+    key = f"{owner}/{repo}".lower()
+    if key not in _GH_REPO_CACHE:
+        _GH_REPO_CACHE[key] = _gh_api_get(f"/repos/{owner}/{repo}", lang=lang)
+    return _GH_REPO_CACHE[key]
+
+
+def _gh_repo_item(gh: Dict[str, Any]) -> Dict[str, Any]:
+    """把 GitHub API 的仓库对象映射为 zread 格式的仓库条目"""
+    return {
+        "url": gh.get("html_url", ""),
+        "owner": (gh.get("owner") or {}).get("login", ""),
+        "name": gh.get("name", ""),
+        "description": gh.get("description") or "",
+        "language": gh.get("language") or "",
+        "topics": gh.get("topics", []) or [],
+        "star_count": gh.get("stargazers_count", 0),
+        "stars": gh.get("stargazers_count", 0),
+    }
+
+
+def _gh_doc_rank(path: str) -> Tuple[int, str]:
+    """文档排序：README 最前，其次根目录，再次 docs/ 目录，最后其余"""
+    lower = path.lower()
+    name = lower.rsplit("/", 1)[-1]
+    if "/" not in path and name.startswith("readme"):
+        rank = 0
+    elif "/" not in path:
+        rank = 1
+    elif lower.startswith(("docs/", "doc/", "documentation/")):
+        rank = 2
+    else:
+        rank = 3
+    return (rank, lower)
+
+
+def _gh_doc_tree(owner: str, repo: str, lang: str = "zh") -> Optional[List[str]]:
+    """列出仓库中的文档文件（Markdown/reST），按重要性排序（进程内缓存）"""
+    key = f"{owner}/{repo}".lower()
+    if key in _GH_TREE_CACHE:
+        return _GH_TREE_CACHE[key]
+
+    info = _gh_repo_get(owner, repo, lang)
+    if not info:
+        _GH_TREE_CACHE[key] = None
+        return None
+    branch = info.get("default_branch") or "HEAD"
+
+    data = _gh_api_get(
+        f"/repos/{owner}/{repo}/git/trees/{branch}",
+        params={"recursive": "1"},
+        lang=lang,
+    )
+    if not data:
+        _GH_TREE_CACHE[key] = None
+        return None
+
+    paths = [
+        item.get("path", "")
+        for item in data.get("tree", [])
+        if item.get("type") == "blob"
+        and (
+            item.get("path", "").lower().endswith(_GH_DOC_EXTENSIONS)
+            or item.get("path", "").rsplit("/", 1)[-1].lower() == "readme"
+        )
+    ]
+    paths.sort(key=_gh_doc_rank)
+    result = paths[:_GH_DOC_TREE_LIMIT]
+    _GH_TREE_CACHE[key] = result
+    return result
+
+
+def _direct_repo_outline(
+    repo_url_or_path: str, lang: str = "zh"
+) -> Optional[List[Dict[str, Any]]]:
+    """直连模式大纲：仓库自带的文档文件列表（slug = 文件路径）"""
+    parsed = parse_repo_url(repo_url_or_path)
+    owner, repo = parsed["owner"], parsed["repo"]
+    tree = _gh_doc_tree(owner, repo, lang)
+    if tree is None:
+        return None
+
+    pages = []
+    for order, path in enumerate(tree, 1):
+        parts = path.split("/")
+        section = parts[0] if len(parts) > 1 else ""
+        group = "/".join(parts[1:-1])
+        pages.append(
+            {
+                "page_id": path,
+                "slug": path,
+                "title": path,
+                "topic": parts[-1],
+                "group": group,
+                "section": section,
+                "order": order,
+            }
+        )
+    return pages
+
+
+def _direct_fetch_markdown(
+    repo_url_or_path: str, slug: str, lang: str = "zh"
+) -> Optional[str]:
+    """直连模式读取文档：slug 即仓库内文件路径；默认 slug 映射到 README"""
+    parsed = parse_repo_url(repo_url_or_path)
+    owner, repo = parsed["owner"], parsed["repo"]
+    if slug == "1-overview":
+        for candidate in ("README.md", "README.rst", "README", "readme.md"):
+            content = _gh_fetch_raw(owner, repo, candidate, lang)
+            if content is not None:
+                return content
+        return None
+    return _gh_fetch_raw(owner, repo, slug, lang)
+
+
+def _direct_search_wiki(
+    repo_url_or_path: str, query: str, lang: str = "zh"
+) -> Optional[List[Dict[str, Any]]]:
+    """直连模式文档搜索：下载文档文件后按行匹配关键词"""
+    parsed = parse_repo_url(repo_url_or_path)
+    owner, repo = parsed["owner"], parsed["repo"]
+    tree = _gh_doc_tree(owner, repo, lang)
+    if tree is None:
+        return None
+    candidates = tree[:_GH_SEARCH_FILE_LIMIT]
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def fetch(path: str) -> Tuple[str, Optional[str]]:
+        return (path, _gh_fetch_raw(owner, repo, path, lang))
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        fetched = list(pool.map(fetch, candidates))
+
+    needle = query.lower()
+    results: List[Dict[str, Any]] = []
+    for path, content in fetched:
+        if not content:
+            continue
+        matches = []
+        for line in content.splitlines():
+            stripped = line.strip()
+            if needle in stripped.lower():
+                # 用 <em> 标记命中词，格式化层负责高亮或去除标签
+                pattern = re.compile(re.escape(query), re.IGNORECASE)
+                highlighted = pattern.sub(lambda m: f"<em>{m.group(0)}</em>", stripped)
+                matches.append({"content": highlighted[:300]})
+                if len(matches) >= 3:
+                    break
+        if matches:
+            results.append({"title": path, "slug": path, "matches": matches})
+    return results
+
+
+def _direct_search_repos(
+    query: str, lang: str = "zh"
+) -> Optional[List[Dict[str, Any]]]:
+    """直连模式仓库搜索：GitHub search API"""
+    data = _gh_api_get(
+        "/search/repositories",
+        params={"q": query, "per_page": 10},
+        lang=lang,
+    )
+    if data is None:
+        return None
+    return [_gh_repo_item(item) for item in data.get("items", [])]
+
+
+def _direct_trending(lang: str = "zh", weeks: int = 4) -> Optional[List[Dict[str, Any]]]:
+    """直连模式热榜：按周查询 GitHub 上新建且星标最多的仓库"""
+    groups: List[Dict[str, Any]] = []
+    now = arrow.utcnow()
+    for offset in range(max(1, weeks)):
+        end = now.shift(weeks=-offset)
+        start = end.shift(weeks=-1)
+        query = f"created:{start.format('YYYY-MM-DD')}..{end.format('YYYY-MM-DD')} stars:>10"
+        data = _gh_api_get(
+            "/search/repositories",
+            params={"q": query, "sort": "stars", "order": "desc", "per_page": 10},
+            lang=lang,
+        )
+        if data is None:
+            break
+        groups.append(
+            {
+                "title": tr("messages.direct_trending_title", lang),
+                "time_span": {
+                    "start": start.format("YYYY-MM-DD"),
+                    "end": end.format("YYYY-MM-DD"),
+                },
+                "repos": [_gh_repo_item(item) for item in data.get("items", [])],
+            }
+        )
+    return groups or None
+
+
+def _direct_recommend(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any]]:
+    """直连模式随机推荐：GitHub search 结果中随机抽取"""
+    import random
+
+    query = f"topic:{topic} stars:>100" if topic else "stars:>5000"
+    data = _gh_api_get(
+        "/search/repositories",
+        params={
+            "q": query,
+            "sort": "stars",
+            "order": "desc",
+            "per_page": 30,
+            "page": random.randint(1, 3),
+        },
+        lang=lang,
+    )
+    if data is None:
+        return None
+    items = [_gh_repo_item(item) for item in data.get("items", [])]
+    random.shuffle(items)
+    return {"topics": [topic] if topic else [], "repos": items[:10]}
+
+
+def _direct_repo_metadata(
+    repo_url_or_path: str, lang: str = "zh"
+) -> Optional[Dict[str, Any]]:
+    """直连模式仓库信息：GitHub repos API 映射为 zread 元数据格式"""
+    parsed = parse_repo_url(repo_url_or_path)
+    owner, repo = parsed["owner"], parsed["repo"]
+    gh = _gh_repo_get(owner, repo, lang)
+    if gh is None:
+        return {"_error": "not_found"}
+
+    item = _gh_repo_item(gh)
+    # 直连模式没有收录/索引概念，标记为可用避免误报"未收录"
+    item["status"] = "success"
+    pushed_at = gh.get("pushed_at")
+    if pushed_at:
+        try:
+            item["last_commit"] = {"when": arrow.get(pushed_at).int_timestamp}
+        except Exception:
+            pass
+    gh_license = gh.get("license")
+    if isinstance(gh_license, dict):
+        item["license"] = gh_license
+    return item
+
+
+def _direct_fetch_file_meta(
+    repo_path: str,
+    file_path: str,
+    start_line: Optional[int] = None,
+    end_line: Optional[int] = None,
+    lang: str = "zh",
+) -> Optional[Dict[str, Any]]:
+    """直连模式读取文件：raw.githubusercontent + 本地行号截取"""
+    parsed = parse_repo_url(repo_path)
+    owner, repo = parsed["owner"], parsed["repo"]
+    content = _gh_fetch_raw(owner, repo, file_path, lang)
+    if content is None:
+        print(tr("errors.file_not_found_or_inaccessible", lang))
+        return None
+
+    lines = content.split("\n")
+    total_lines = len(lines)
+    size = len(content.encode("utf-8"))
+
+    if start_line is None and end_line is None:
+        return {
+            "content": content,
+            "total_lines": total_lines,
+            "size": size,
+            "file_path": file_path,
+            "start_line": 1,
+            "end_line": total_lines,
+            "is_snippet": False,
+        }
+
+    start_idx = max(0, (start_line or 1) - 1)
+    end_idx = min(total_lines, end_line) if end_line is not None else total_lines
+    selected = "\n".join(lines[start_idx:end_idx]) if start_idx < end_idx else ""
+    return {
+        "content": selected,
+        "total_lines": total_lines,
+        "size": size,
+        "file_path": file_path,
+        "start_line": start_line or 1,
+        "end_line": end_line or total_lines,
+        "is_snippet": False,
+    }
 
 
 # ==========================================
@@ -3328,6 +3796,8 @@ def _print_help_with_env(ctx: typer.Context) -> None:
     env_table.add_row("[green]ZREAD_TOKEN[/green]", tr("cli.env_var_token_desc"))
     env_table.add_row("[green]ZREAD_LANG[/green]", tr("cli.env_var_lang_desc"))
     env_table.add_row("[green]ZREAD_MODEL[/green]", tr("cli.env_var_model_desc"))
+    env_table.add_row("[green]ZREAD_DIRECT[/green]", tr("cli.env_var_direct_desc"))
+    env_table.add_row("[green]GITHUB_TOKEN[/green]", tr("cli.env_var_github_token_desc"))
 
     env_panel = Panel(
         env_table,
@@ -3457,6 +3927,9 @@ def cmd_mcp(
     lang: Annotated[
         Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """启动 MCP 服务器
 
@@ -3474,6 +3947,8 @@ def cmd_mcp(
     # MCP 进程级默认语言：显式参数优先，否则沿用环境变量推导结果
     if lang:
         set_default_lang(lang)
+    if direct:
+        set_direct_mode(True)
 
     # 解析地址参数
     host, port, path = _parse_address(transport, address)
@@ -3723,6 +4198,9 @@ def cmd_get_outline(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """获取文档目录结构
 
@@ -3735,6 +4213,8 @@ def cmd_get_outline(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
+    if direct:
+        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     outline = _run_with_cli_status(
@@ -3792,6 +4272,9 @@ def cmd_cat(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """查看仓库内容（支持 zread 文档或 GitHub 文件）
 
@@ -3811,6 +4294,8 @@ def cmd_cat(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo_or_url')}", err=True)
         raise typer.Exit(1)
+    if direct:
+        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     # 收集所有位置参数
@@ -4040,7 +4525,7 @@ def _cat_zread_page(
 
         path_title = " / ".join(parts) if parts else actual_slug
         parsed = parse_repo_url(repo)
-        page_url = f"https://zread.ai/{parsed['repo_path']}/{actual_slug}"
+        page_url = _page_url(parsed["owner"], parsed["repo"], actual_slug)
 
         # 只在非 JSON 模式下输出标题
         if not json_output:
@@ -4107,9 +4592,9 @@ def _process_markdown_links(content: str, repo: str) -> str:
             if url.startswith(("http://", "https://")):
                 full_url = url
             elif url.startswith("/"):
-                full_url = f"https://zread.ai{url}"
+                full_url = f"{BASE_URL}{url}"
             else:
-                full_url = f"https://zread.ai/{repo_path}/{url}"
+                full_url = f"{BASE_URL}/{repo_path}/{url}"
             return f"[🔗{link_text}]({full_url})"
 
         if "." in last_segment:
@@ -4377,6 +4862,9 @@ def cmd_find(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """搜索仓库或文档关键词
 
@@ -4395,6 +4883,8 @@ def cmd_find(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_query')}", err=True)
         raise typer.Exit(1)
+    if direct:
+        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     # 检查 query 参数是否是有效的 owner/repo 格式
@@ -4427,6 +4917,29 @@ def _search_in_repo(
     repo: str, keyword: str, lang: str, json_output: bool, plain: bool = False
 ) -> None:
     """在仓库文档内搜索关键词"""
+    if _is_direct():
+        results = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.search_docs', lang)}[/dim]",
+            _direct_search_wiki,
+            repo,
+            keyword,
+            lang,
+        )
+        if results is None:
+            typer.echo(tr("errors.search_failed", lang), err=True)
+            raise typer.Exit(1)
+
+        if json_output:
+            typer.echo(json.dumps(results, ensure_ascii=False, indent=2))
+        elif not results:
+            typer.echo(tr("messages.no_results", lang))
+        elif plain:
+            typer.echo(_format_search_results_plain(results))
+        else:
+            _format_search_results_rich(results, repo)
+        return
+
     status = _run_with_cli_status(
         not (json_output or plain),
         f"[dim]{tr('status.fetch_repo_info', lang)}[/dim]",
@@ -4469,14 +4982,26 @@ def _search_repos(
     query: str, lang: str, json_output: bool, plain: bool = False
 ) -> None:
     """搜索 GitHub 仓库"""
-    data = _run_with_cli_status(
-        not (json_output or plain),
-        f"[dim]{tr('status.search_repos', lang)}[/dim]",
-        _cli_http_get,
-        f"{BASE_URL}/api/v1/repo?q={urllib.parse.quote(query)}",
-        lang=lang,
-        error_msg=tr("errors.search_failed", lang),
-    )
+    if _is_direct():
+        data = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.search_repos', lang)}[/dim]",
+            _direct_search_repos,
+            query,
+            lang,
+        )
+        if data is None:
+            typer.echo(tr("errors.search_failed", lang), err=True)
+            raise typer.Exit(1)
+    else:
+        data = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.search_repos', lang)}[/dim]",
+            _cli_http_get,
+            f"{BASE_URL}/api/v1/repo?q={urllib.parse.quote(query)}",
+            lang=lang,
+            error_msg=tr("errors.search_failed", lang),
+        )
     if isinstance(data, dict):
         data = data.get("list", [])
 
@@ -4507,6 +5032,9 @@ def cmd_top(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """获取热门仓库榜单
 
@@ -4517,14 +5045,28 @@ def cmd_top(
         top --plain
     """
     lang = _resolve_lang(lang)
-    result = _run_with_cli_status(
-        not (json_output or plain),
-        f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
-        _cli_http_get,
-        f"{BASE_URL}/api/v1/public/repo/trending",
-        lang=lang,
-        error_msg=tr("errors.fetch_trending", lang),
-    )
+    if direct:
+        set_direct_mode(True)
+    if _is_direct():
+        result = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
+            _direct_trending,
+            lang,
+            weeks,
+        )
+        if result is None:
+            typer.echo(tr("errors.fetch_trending", lang), err=True)
+            raise typer.Exit(1)
+    else:
+        result = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
+            _cli_http_get,
+            f"{BASE_URL}/api/v1/public/repo/trending",
+            lang=lang,
+            error_msg=tr("errors.fetch_trending", lang),
+        )
     # 限制显示最近 weeks 周的榜单
     limited_result = result[:weeks] if isinstance(result, list) else []
 
@@ -4554,6 +5096,9 @@ def cmd_rand(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """随机发现推荐仓库
 
@@ -4573,17 +5118,31 @@ def cmd_rand(
         rand rust --plain
     """
     lang = _resolve_lang(lang)
-    url = f"{BASE_URL}/api/v1/repo/recommend"
-    if topic:
-        url += f"?topic={urllib.parse.quote(topic)}"
-    data = _run_with_cli_status(
-        not (json_output or plain),
-        f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
-        _cli_http_get,
-        url,
-        lang=lang,
-        error_msg=tr("errors.fetch_recommend", lang),
-    )
+    if direct:
+        set_direct_mode(True)
+    if _is_direct():
+        data = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
+            _direct_recommend,
+            topic,
+            lang,
+        )
+        if data is None:
+            typer.echo(tr("errors.fetch_recommend", lang), err=True)
+            raise typer.Exit(1)
+    else:
+        url = f"{BASE_URL}/api/v1/repo/recommend"
+        if topic:
+            url += f"?topic={urllib.parse.quote(topic)}"
+        data = _run_with_cli_status(
+            not (json_output or plain),
+            f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
+            _cli_http_get,
+            url,
+            lang=lang,
+            error_msg=tr("errors.fetch_recommend", lang),
+        )
 
     if json_output:
         typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
@@ -4636,6 +5195,9 @@ def fetch_repo_metadata(repo_url_or_path: str) -> Optional[Dict[str, Any]]:
         - owner/repo
     :return: API 返回的完整 data 字段，失败返回 None
     """
+    if _DIRECT_MODE:
+        return _direct_repo_metadata(repo_url_or_path)
+
     parsed = parse_repo_url(repo_url_or_path)
     repo_path = parsed["repo_path"]
     owner, name = parsed["owner"], parsed["repo"]
@@ -4679,6 +5241,9 @@ def _get_ai_unavailable_message(
     repo_path: str, metadata: Optional[Dict[str, Any]]
 ) -> str:
     """根据仓库状态生成 AI 不可用提示。"""
+    if _DIRECT_MODE:
+        # 直连模式没有收录状态，文档直接来自 GitHub，无需提示
+        return ""
     if not metadata:
         return tr("errors.fetch_repo_status")
 
@@ -4708,6 +5273,9 @@ def cmd_stat(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """显示仓库信息
 
@@ -4720,6 +5288,8 @@ def cmd_stat(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
+    if direct:
+        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     data = _run_with_cli_status(
@@ -4815,11 +5385,15 @@ def cmd_ai(
 
     import asyncio
 
+    lang = _resolve_lang(lang)
+    if _DIRECT_MODE:
+        typer.echo(f"❌ {tr('errors.ai_direct_mode', lang)}", err=True)
+        raise typer.Exit(1)
+
     _set_token(token)
     if not _DEFAULT_TOKEN:
         typer.echo(tr("errors.ai_requires_token"), err=True)
         raise typer.Exit(1)
-    lang = _resolve_lang(lang)
 
     try:
         if question:
@@ -5162,6 +5736,44 @@ async def _fetch_page_async(
     if not slug:
         return {"success": False, "page": page, "error": "no slug"}
 
+    if _DIRECT_MODE:
+        # 直连模式：slug 即文件路径，从 raw.githubusercontent 下载并保留目录结构
+        try:
+            parsed = parse_repo_url(repo)
+            owner, repo_name = parsed["owner"], parsed["repo"]
+            url = f"{GITHUB_RAW_URL}/{owner}/{repo_name}/HEAD/{slug}"
+            response = await client.get(
+                url, headers={"User-Agent": USER_AGENT}, timeout=30.0
+            )
+            if response.status_code == 404 and _GITHUB_TOKEN:
+                response = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": USER_AGENT,
+                        "Authorization": f"Bearer {_GITHUB_TOKEN}",
+                    },
+                    timeout=30.0,
+                )
+            response.raise_for_status()
+            md_content = response.text
+
+            file_path = output_dir / slug
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            file_path.write_text(md_content, encoding="utf-8")
+
+            if progress_cb:
+                progress_cb()
+            return {
+                "success": True,
+                "page": page,
+                "content": md_content,
+                "file_path": file_path,
+            }
+        except Exception as e:
+            if progress_cb:
+                progress_cb()
+            return {"success": False, "page": page, "error": str(e)}
+
     try:
         # 获取 markdown 内容
         parsed = parse_repo_url(repo)
@@ -5380,10 +5992,11 @@ def _generate_llms_full_txt(
     # 生成内容
     lines = []
     github_url = f"https://github.com/{owner}/{repo_name}"
-    zread_url = f"https://zread.ai/{owner}/{repo_name}"
+    zread_url = f"{BASE_URL}/{owner}/{repo_name}"
 
     lines.append(github_url)
-    lines.append(zread_url)
+    if not _DIRECT_MODE:
+        lines.append(zread_url)
     lines.append("")
 
     # 添加 GitHub 仓库信息
@@ -5405,7 +6018,7 @@ def _generate_llms_full_txt(
                 slug = page_info["slug"]
                 topic = page_info["topic"]
                 if slug in content_map:
-                    lines.append(f"- [{slug}]({zread_url}/{slug})")
+                    lines.append(f"- [{slug}]({_page_url(owner, repo_name, slug)})")
                     lines.append("")
                     lines.append(content_map[slug])
                     lines.append("")
@@ -5423,7 +6036,7 @@ def _generate_llms_full_txt(
                 slug = page_info["slug"]
                 topic = page_info["topic"]
                 if slug in content_map:
-                    lines.append(f"- [{slug}]({zread_url}/{slug})")
+                    lines.append(f"- [{slug}]({_page_url(owner, repo_name, slug)})")
                     lines.append("")
                     lines.append(content_map[slug])
                     lines.append("")
@@ -5475,10 +6088,11 @@ def _generate_llms_txt(
     # 生成内容
     lines = []
     github_url = f"https://github.com/{owner}/{repo_name}"
-    zread_url = f"https://zread.ai/{owner}/{repo_name}"
+    zread_url = f"{BASE_URL}/{owner}/{repo_name}"
 
     lines.append(github_url)
-    lines.append(zread_url)
+    if not _DIRECT_MODE:
+        lines.append(zread_url)
     lines.append("")
 
     # 添加 GitHub 仓库信息
@@ -5539,6 +6153,9 @@ def cmd_cp(
     concurrency: Annotated[
         int, typer.Option("--concurrency", "-c", help=tr("cli.options.concurrency"))
     ] = 10,
+    direct: Annotated[
+        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
+    ] = False,
 ) -> None:
     """导出仓库文档到本地
 
@@ -5553,6 +6170,8 @@ def cmd_cp(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
+    if direct:
+        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     # 默认输出到当前目录
@@ -5696,13 +6315,15 @@ def _run_mcp_server(
     if token:
         set_default_token(token)
 
-    # 确定是否有 token
-    has_token = bool(_DEFAULT_TOKEN)
+    # 确定是否有 token（直连模式下 AI 问答不可用，不注册 ask_ai）
+    has_token = bool(_DEFAULT_TOKEN) and not _DIRECT_MODE
 
     mcp = _get_mcp(has_token)
 
     # 打印启动信息到 stderr
-    if has_token:
+    if _DIRECT_MODE:
+        print(tr("mcp.direct_mode"), file=sys.stderr)
+    elif has_token:
         print(tr("mcp.token_enabled"), file=sys.stderr)
     else:
         print(tr("mcp.token_missing"), file=sys.stderr)

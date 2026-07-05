@@ -226,6 +226,7 @@ zread install <claude-code|codex|hermes> [-t token] [-p]
 | `-j, --json`         | JSON 格式输出                                                  |
 | `-p, --plain`        | 纯文本输出                                                     |
 | `-t, --token`        | ZREAD_TOKEN                                                    |
+| `-d, --direct`       | 直连模式：数据仅来自 GitHub，完全不访问 zread.ai               |
 | `-h, --help`         | 显示帮助                                                       |
 | `-v, --version`      | 显示版本                                                       |
 
@@ -407,6 +408,57 @@ uvx zread mcp
 
 之后想启用 AI 问答，按下文说明获取免费 token 并通过 `ZREAD_TOKEN` 配置即可。
 
+### 直连模式：完全不连接 zread.ai
+
+上述方式仍会匿名访问 zread.ai。如果希望 zread **完全不访问** zread.ai，可使用直连模式：所有数据直接来自 GitHub（`api.github.com` + `raw.githubusercontent.com`）。
+
+```bash
+# 按命令启用
+zread ls golang/go --direct
+zread cat golang/go docs/README.md -d
+zread find golang/go goroutine -d          # 在仓库自带的 Markdown 文档中搜索
+zread stat torvalds/linux -d
+zread cp vuejs/vue -d
+
+# 进程级：环境变量
+export ZREAD_DIRECT=1
+
+# 或写入配置文件 ~/.config/zread/zread.toml
+# [zread]
+# direct = true
+
+# 直连模式启动 MCP 服务器
+zread mcp --direct
+```
+
+直连模式下的功能差异：
+
+| 功能 | zread.ai 模式 | 直连模式 |
+| --- | --- | --- |
+| `ls` / 文档目录 | AI 生成的 wiki 页面 | 仓库自带的 Markdown 文件（README、`docs/` 等） |
+| `cat` / `read_doc` | AI wiki 页面内容 | GitHub 原始文件内容 |
+| `find <repo> <query>` | wiki 全文搜索 | 在仓库 Markdown 文档中关键词匹配 |
+| `find <query>` / `top` / `rand` / `stat` | zread.ai 目录 | GitHub 搜索 / 仓库 API |
+| `cp` 导出 | wiki 导出 + `llms.txt` | Markdown 文档导出 + `llms.txt` |
+| `zread ai` / MCP `ask_ai` 工具 | zread.ai 大模型 | **不可用**（明确报错；MCP 不注册该工具） |
+
+直连模式匿名使用 GitHub 公开 API（每小时 60 次）。设置 `GITHUB_TOKEN`（或 `ZREAD_GITHUB_TOKEN` / 配置文件中的 `github_token`）可提升限额并访问私有仓库。读取文件内容（`cat`、`read_doc`、`read_source_file`）完全不消耗 API 配额。
+
+无 token、不访问 zread.ai 的 MCP 客户端配置：
+
+```json
+{
+  "mcpServers": {
+    "zread": {
+      "command": "uvx",
+      "args": ["zread", "mcp", "--direct"]
+    }
+  }
+}
+```
+
+另外：`ZREAD_BASE_URL` 可以把非直连模式指向自建的 zread 兼容 API，而不是 `https://zread.ai`。
+
 ## 获取 Token
 
 AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
@@ -429,6 +481,9 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 | `ZREAD_TOKEN` | zread.ai 登录账号的免费 JWT Token，仅 AI 问答功能需要         |
 | `ZREAD_LANG`  | 默认语言 (`zh` / `en`)，优先级低于 `--lang`，高于系统locale   |
 | `ZREAD_MODEL` | 默认 AI 模型 (`glm-5.1` / `claude-sonnet-4.6`)，优先级低于 `--model` |
+| `ZREAD_DIRECT` | `1`/`true` 启用直连模式：数据仅来自 GitHub，完全不访问 zread.ai |
+| `GITHUB_TOKEN` | 可选的 GitHub token，直连模式使用（提升 API 限额、访问私有仓库）；`ZREAD_GITHUB_TOKEN` 优先级更高 |
+| `ZREAD_BASE_URL` | 自建 zread 兼容 API 的地址（默认 `https://zread.ai`） |
 
 ## 配置文件
 
@@ -446,6 +501,9 @@ AI 问答功能需要登录 Zread.ai 账号获取免费的 JWT Token：
 token = "your-token-here"
 lang = "zh"  # 可选，默认为 "zh"
 model = "glm-5.1"  # 可选，默认为 "glm-5.1"，也支持 "claude-sonnet-4.6"
+direct = false  # 可选，true = 直连模式（仅访问 GitHub，不访问 zread.ai）
+github_token = ""  # 可选，直连模式使用的 GitHub token
+base_url = "https://zread.ai"  # 可选，自建 zread 兼容 API 地址
 ```
 
 ## 贡献
