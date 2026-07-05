@@ -1,0 +1,32 @@
+# Company-wide zread MCP service.
+#
+# Configure once in .env (see .env.example), then:
+#   docker compose up -d
+#
+# Every engineer / AI agent connects to the shared endpoint:
+#   http://<your-host>:8708/mcp
+#
+#   zread install claude-code --url http://<your-host>:8708/mcp
+#   zread install codex       --url http://<your-host>:8708/mcp
+#   zread install hermes      --url http://<your-host>:8708/mcp
+
+services:
+  zread-mcp:
+    build: .
+    image: zread-mcp:latest
+    container_name: zread-mcp
+    restart: unless-stopped
+    ports:
+      - "${ZREAD_MCP_PORT:-8708}:8708"
+    environment:
+      # zread.ai account token: set it once here and the whole company
+      # gets the ask_ai tool without distributing the token to clients.
+      ZREAD_TOKEN: ${ZREAD_TOKEN:-}
+      # 1/true = direct mode: data comes from GitHub only, zread.ai is
+      # never contacted (ask_ai is disabled).
+      ZREAD_DIRECT: ${ZREAD_DIRECT:-0}
+      # Optional GitHub token for direct mode (rate limits, private repos).
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      ZREAD_LANG: ${ZREAD_LANG:-en}
+      ZREAD_MODEL: ${ZREAD_MODEL:-glm-5.1}
+      ZREAD_BASE_URL: ${ZREAD_BASE_URL:-https://zread.ai}

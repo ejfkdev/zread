@@ -357,6 +357,68 @@ Add the following configuration to any MCP-compatible client:
 }
 ```
 
+## Company-wide Deployment (Docker)
+
+Instead of every engineer running a local `uvx zread mcp` process per machine, you can run **one shared zread MCP service** for the whole company and point every AI agent at it. Configuration (zread.ai token, direct mode, GitHub token) lives in one place, and clients need zero local setup beyond a URL.
+
+### Run the server
+
+```bash
+# One-off
+docker build -t zread-mcp .
+docker run -d --name zread-mcp -p 8708:8708 \
+  -e ZREAD_TOKEN=your-token \
+  zread-mcp
+
+# Or with compose (recommended): copy .env.example to .env, edit, then
+docker compose up -d
+```
+
+The shared MCP endpoint is `http://<your-host>:8708/mcp` (streamable HTTP).
+
+Server-side environment variables (see `.env.example`): `ZREAD_TOKEN` (enables `ask_ai` for everyone without distributing the token), `ZREAD_DIRECT` (company-wide direct mode, no zread.ai), `GITHUB_TOKEN`, `ZREAD_LANG`, `ZREAD_MODEL`, `ZREAD_BASE_URL`.
+
+### Connect your agents
+
+Each engineer runs one command, pointing at the shared server instead of a local process:
+
+```bash
+uvx zread install claude-code --url http://zread.internal:8708/mcp
+uvx zread install hermes      --url http://zread.internal:8708/mcp
+uvx zread install codex       --url http://zread.internal:8708/mcp   # prints the config.toml snippet
+```
+
+Equivalent manual configs:
+
+```bash
+# Claude Code
+claude mcp add --scope user --transport http zread http://zread.internal:8708/mcp
+```
+
+```toml
+# Codex (~/.codex/config.toml)
+[mcp_servers.zread]
+url = "http://zread.internal:8708/mcp"
+```
+
+```yaml
+# Hermes Agent (~/.hermes/config.yaml)
+mcp_servers:
+  zread:
+    url: "http://zread.internal:8708/mcp"
+```
+
+### CLI inside the container
+
+The image ships the full CLI, so the same deployment doubles as a shared toolbox:
+
+```bash
+docker exec zread-mcp zread ls golang/go -p
+docker run --rm zread-mcp top -p
+```
+
+> Note: the MCP endpoint has no built-in authentication — deploy it on your internal network or behind a reverse proxy that handles auth/TLS.
+
 ## MCP Tools
 
 | Tool              | Description                                                                 |

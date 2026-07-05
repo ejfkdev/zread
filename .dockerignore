@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+build
+dist
+*.egg-info
+__pycache__
+image
+uv.lock
+.env
+docker-compose.yml
+Dockerfile
+CONTRIBUTING.md
+README.zh.md
+scripts
+server.json
+zread_version.py

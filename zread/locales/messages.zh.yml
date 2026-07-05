@@ -44,6 +44,7 @@ zh:
       model: "模型：glm-5.1 或 claude-sonnet-4.6（默认 glm-5.1，可通过 ZREAD_MODEL 环境变量或配置文件设置）"
       concurrency: "并发数（默认：10）"
       print_only: "仅打印配置内容，不做任何修改"
+      mcp_url: "共享 zread MCP 服务的 URL（HTTP 模式），如 http://zread.internal:8708/mcp——智能体将连接该地址而非启动本地进程"
       direct: "直连模式：所有数据直接来自 GitHub，完全不访问 zread.ai（文档即仓库自带的 Markdown 文件）"
   status:
     fetch_outline: "正在获取文档目录..."
