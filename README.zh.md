@@ -23,8 +23,25 @@ Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 
 
 - 🔍 无需 Token 即可浏览文档、搜索代码、发现仓库
 - 🤖 支持 AI 智能问答（基于仓库文档训练）
+- 🔗 直连模式：完全不依赖 zread.ai，数据直接来自 GitHub
+- 🛠️ 一条命令配置 Claude Code、Codex、Hermes Agent（`zread install`）
+- 🏢 公司级部署：一个 Docker 化的共享 MCP 服务供全团队使用
 - 🌐 支持多种传输协议：stdio、HTTP、SSE
 - ⚡ 一行命令即可运行，零配置上手
+
+## 目录
+
+- [功能](#功能)
+- [运行示例](#运行示例)
+- [快速启动](#快速启动) — [命令行工具](#命令行工具) · [从源码安装](#从源码安装) · [MCP 服务器](#mcp-服务器) · [AI 问答](#ai-问答)
+- [CLI 命令](#cli-命令) — [全局选项](#全局选项) · [命令示例](#命令示例)
+- [MCP 客户端配置](#mcp-客户端配置) — [Claude Code](#claude-code) · [Codex](#codex) · [Hermes Agent](#hermes-agent)
+- [公司级部署（Docker）](#公司级部署docker)
+- [MCP 工具](#mcp-工具)
+- [无需 Zread.ai 账号使用](#无需-zreadai-账号使用) — [直连模式](#直连模式完全不连接-zreadai)
+- [获取 Token](#获取-token)
+- [环境变量](#环境变量)
+- [配置文件](#配置文件)
 
 ## 功能
 
@@ -34,7 +51,9 @@ Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 
 - 📥 **导出文档** - 批量导出仓库文档到本地，生成 llms.txt 和 llms-full.txt（CLI 专属）
 - 🤖 **AI 问答** - 向仓库 AI 助手提问（需登录账号的免费 Token）
 - 📄 **查看源码** - 读取源代码文件内容
-- 🔌 **MCP 集成** - 与 AI 助手无缝集成
+- 🔌 **MCP 集成** - 与 AI 编码智能体无缝集成（`zread install claude-code|codex|hermes`）
+- 🔗 **直连模式** - 除 AI 问答外的全部功能可直接基于 GitHub 运行，完全不访问 zread.ai（`--direct`）
+- 🏢 **Docker 部署** - 为整个组织部署一个共享 MCP 服务
 
 ## 运行示例
 
@@ -180,13 +199,13 @@ zread ai facebook/react "这个项目的代码结构是怎样的"
 
 ```bash
 # 启动 MCP 服务器
-zread mcp [stdio|http|sse] [address] [options]
+zread mcp [stdio|http|sse] [address] [-t token] [-l zh|en] [-d]
 
 # 获取仓库文档目录结构
-zread ls <repo> [-l zh|en] [-j] [-p]
+zread ls <repo> [-l zh|en] [-j] [-p] [-d]
 
 # 获取指定页面内容或源代码文件
-zread cat <repo> [slug_or_path] [-l zh|en] [-j] [-p]
+zread cat <repo> [slug_or_path] [-l zh|en] [-j] [-p] [-d]
 #
 # 自动识别参数类型：
 # - 第一个参数只有 repo，第二个参数是 slug/序号(如: 1-overview, 1): 读取 zread 文档页面
@@ -197,23 +216,23 @@ zread find <query>                        # 搜索 GitHub 仓库
 zread find <repo> <query>                 # 在仓库文档内搜索
 
 # 发现推荐仓库
-zread rand [topic] [-l zh|en] [-j] [-p]
+zread rand [topic] [-l zh|en] [-j] [-p] [-d]
 
 # 获取热门仓库榜单
-zread top [weeks] [-l zh|en] [-j] [-p]
+zread top [weeks] [-l zh|en] [-j] [-p] [-d]
 
 # 获取仓库信息（会静默提交未收录的仓库、刷新过期文档）
-zread stat <repo> [-l zh|en] [-j] [-p]
+zread stat <repo> [-l zh|en] [-j] [-p] [-d]
 
-# 向仓库 AI 提问（需要登录账号的免费 Token）
+# 向仓库 AI 提问（需要登录账号的免费 Token；直连模式下不可用）
 zread ai <repo> [question] [-l zh|en] [-t token] [-p] [-j] [-m model]
 
-
 # 导出仓库文档到本地（CLI 专属，生成 llms.txt 和 llms-full.txt）
-zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
+zread cp <repo> [output_dir] [-l zh|en] [-c concurrency] [-d]
 
 # 为 AI 编码智能体配置 zread MCP 服务
-zread install <claude-code|codex|hermes> [-t token] [-p]
+# （默认配置本地 stdio 服务；-u 可指向共享 HTTP 服务）
+zread install <claude-code|codex|hermes> [-t token] [-u url] [-p]
 ```
 
 ### 全局选项
@@ -273,10 +292,16 @@ uvx zread cp golang/go                          # 导出到当前目录
 uvx zread cp python/cpython -l zh               # 指定语言
 uvx zread cp vuejs/vue -c 20                    # 调整并发数
 
+# 直连模式（仅访问 GitHub，不访问 zread.ai）
+uvx zread ls golang/go -d
+uvx zread cat golang/go docs/README.md -d
+uvx zread find golang/go goroutine -d
+
 # 配置 AI 编码智能体
 uvx zread install claude-code                   # 配置 Claude Code
 uvx zread install codex -t your-token           # 配置 Codex 并携带 token
 uvx zread install hermes --print                # 仅打印 Hermes 配置
+uvx zread install claude-code --url http://zread.internal:8708/mcp  # 指向共享服务
 ```
 
 ## MCP 客户端配置
@@ -423,16 +448,18 @@ docker run --rm zread-mcp top -p
 
 ## MCP 工具
 
-| 工具              | 说明                                                                       |
-| ---------------- | -------------------------------------------------------------------------- |
-| `read_doc`       | 获取指定文档页面内容                                                       |
-| `search_wiki`   | 在仓库文档中搜索关键词                                                     |
-| `get_doc_outline`| 获取仓库文档目录结构                                                       |
-| `discover_repo`  | 随机发现推荐仓库                                                           |
-| `get_trending`   | 热门仓库榜单                                                               |
-| `get_repo_info`  | 获取仓库信息和索引状态                                                     |
-| `read_source_file`| 获取源代码文件内容                                                         |
-| `ask_ai`         | 向仓库 AI 智能问答（需 Token），支持 `glm-5.1` 和 `claude-sonnet-4.6` 模型 |
+| 工具              | 说明                                                                       | 直连模式 |
+| ---------------- | -------------------------------------------------------------------------- | -------- |
+| `read_doc`       | 获取指定文档页面内容                                                       | ✅ 仓库 Markdown 文件 |
+| `search_wiki`   | 在仓库文档中搜索关键词                                                     | ✅ 在仓库文档中匹配 |
+| `get_doc_outline`| 获取仓库文档目录结构                                                       | ✅ 仓库 Markdown 目录树 |
+| `discover_repo`  | 随机发现推荐仓库                                                           | ✅ GitHub 搜索 |
+| `get_trending`   | 热门仓库榜单                                                               | ✅ GitHub 搜索 |
+| `get_repo_info`  | 获取仓库信息和索引状态                                                     | ✅ GitHub 仓库 API |
+| `read_source_file`| 获取源代码文件内容                                                         | ✅ raw.githubusercontent |
+| `ask_ai`         | 向仓库 AI 智能问答（需 Token），支持 `glm-5.1` 和 `claude-sonnet-4.6` 模型 | ❌ 不注册 |
+
+`ask_ai` 仅在服务配置了 `ZREAD_TOKEN` 且未启用直连模式时注册。
 
 ## 无需 Zread.ai 账号使用
 

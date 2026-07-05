@@ -23,8 +23,25 @@ Zread helps you and your AI understand codebases faster. Skip the manual source 
 
 - 🔍 Browse docs, search code, and discover repositories without a token
 - 🤖 AI Q&A powered by repository documentation
+- 🔗 Direct mode: run fully disconnected from zread.ai, backed by GitHub only
+- 🛠️ One-command setup for Claude Code, Codex, and Hermes Agent (`zread install`)
+- 🏢 Company-wide deployment: one shared Dockerized MCP server for the whole team
 - 🌐 Multiple transports: stdio, HTTP, and SSE
 - ⚡ One command to run, zero-friction startup
+
+## Table of Contents
+
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Quick Start](#quick-start) — [CLI](#cli-tool) · [from source](#install-from-source) · [MCP server](#mcp-server) · [AI Q&A](#ai-qa)
+- [CLI Commands](#cli-commands) — [global options](#global-options) · [examples](#examples)
+- [MCP Client Configuration](#mcp-client-configuration) — [Claude Code](#claude-code) · [Codex](#codex) · [Hermes Agent](#hermes-agent)
+- [Company-wide Deployment (Docker)](#company-wide-deployment-docker)
+- [MCP Tools](#mcp-tools)
+- [Usage Without a Zread.ai Account](#usage-without-a-zreadai-account) — [direct mode](#direct-mode-no-connection-to-zreadai-at-all)
+- [Get a Token](#get-a-token)
+- [Environment Variables](#environment-variables)
+- [Configuration File](#configuration-file)
 
 ## Features
 
@@ -34,7 +51,9 @@ Zread helps you and your AI understand codebases faster. Skip the manual source 
 - 📥 **Export docs** - export repository docs locally and generate `llms.txt` and `llms-full.txt` (CLI only)
 - 🤖 **AI Q&A** - ask the repository AI assistant questions (requires a free account token)
 - 📄 **Read source files** - inspect source file contents directly
-- 🔌 **MCP integration** - connect seamlessly with AI assistants
+- 🔌 **MCP integration** - connect seamlessly with AI coding agents (`zread install claude-code|codex|hermes`)
+- 🔗 **Direct mode** - every feature except AI Q&A also works straight against GitHub, with zero zread.ai contact (`--direct`)
+- 🏢 **Docker deployment** - ship one shared MCP server for your whole organization
 
 ## Screenshots
 
@@ -179,13 +198,13 @@ zread ai facebook/react "How is this project structured?"
 
 ```bash
 # Start the MCP server
-zread mcp [stdio|http|sse] [address] [options]
+zread mcp [stdio|http|sse] [address] [-t token] [-l zh|en] [-d]
 
 # Show the documentation outline
-zread ls <repo> [-l zh|en] [-j] [-p]
+zread ls <repo> [-l zh|en] [-j] [-p] [-d]
 
 # Read a documentation page or a source file
-zread cat <repo> [slug_or_path] [-l zh|en] [-j] [-p]
+zread cat <repo> [slug_or_path] [-l zh|en] [-j] [-p] [-d]
 #
 # Automatic argument detection:
 # - If the first argument is only repo and the second is a slug/index (for example 1-overview, 1), it reads a zread doc page
@@ -196,22 +215,23 @@ zread find <query>                        # Search GitHub repositories
 zread find <repo> <query>                 # Search within a repository's docs
 
 # Discover recommended repositories
-zread rand [topic] [-l zh|en] [-j] [-p]
+zread rand [topic] [-l zh|en] [-j] [-p] [-d]
 
 # Show trending repositories
-zread top [weeks] [-l zh|en] [-j] [-p]
+zread top [weeks] [-l zh|en] [-j] [-p] [-d]
 
 # Show repository status and metadata (silently submits unindexed repos and refreshes stale docs)
-zread stat <repo> [-l zh|en] [-j] [-p]
+zread stat <repo> [-l zh|en] [-j] [-p] [-d]
 
-# Ask the repository AI (requires a free account token)
+# Ask the repository AI (requires a free account token; not available in direct mode)
 zread ai <repo> [question] [-l zh|en] [-t token] [-p] [-j] [-m model]
 
 # Export repository docs locally and generate llms.txt / llms-full.txt
-zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
+zread cp <repo> [output_dir] [-l zh|en] [-c concurrency] [-d]
 
 # Configure the zread MCP server for an AI coding agent
-zread install <claude-code|codex|hermes> [-t token] [-p]
+# (local stdio by default; -u points the agent at a shared HTTP server)
+zread install <claude-code|codex|hermes> [-t token] [-u url] [-p]
 ```
 
 ### Global Options
@@ -271,10 +291,16 @@ uvx zread cp golang/go
 uvx zread cp python/cpython -l zh
 uvx zread cp vuejs/vue -c 20
 
+# Direct mode (GitHub only, no zread.ai)
+uvx zread ls golang/go -d
+uvx zread cat golang/go docs/README.md -d
+uvx zread find golang/go goroutine -d
+
 # Configure AI coding agents
 uvx zread install claude-code
 uvx zread install codex -t your-token
 uvx zread install hermes --print
+uvx zread install claude-code --url http://zread.internal:8708/mcp
 ```
 
 ## MCP Client Configuration
@@ -421,16 +447,18 @@ docker run --rm zread-mcp top -p
 
 ## MCP Tools
 
-| Tool              | Description                                                                 |
-| ----------------- | --------------------------------------------------------------------------- |
-| `read_doc`        | Get the content of a specific documentation page                            |
-| `search_wiki`     | Search keywords in repository documentation                                 |
-| `get_doc_outline` | Get the repository documentation outline                                    |
-| `discover_repo`   | Discover a recommended repository at random                                 |
-| `get_trending`    | Get trending repository rankings                                            |
-| `get_repo_info`   | Get repository information and indexing status                              |
-| `read_source_file`| Read source code file contents                                              |
-| `ask_ai`          | Ask the repository AI a question (token required), supports `glm-5.1` and `claude-sonnet-4.6` |
+| Tool              | Description                                                                 | In direct mode |
+| ----------------- | --------------------------------------------------------------------------- | -------------- |
+| `read_doc`        | Get the content of a specific documentation page                            | ✅ repo markdown file |
+| `search_wiki`     | Search keywords in repository documentation                                 | ✅ grep over repo docs |
+| `get_doc_outline` | Get the repository documentation outline                                    | ✅ repo markdown tree |
+| `discover_repo`   | Discover a recommended repository at random                                 | ✅ GitHub search |
+| `get_trending`    | Get trending repository rankings                                            | ✅ GitHub search |
+| `get_repo_info`   | Get repository information and indexing status                              | ✅ GitHub repos API |
+| `read_source_file`| Read source code file contents                                              | ✅ raw.githubusercontent |
+| `ask_ai`          | Ask the repository AI a question (token required), supports `glm-5.1` and `claude-sonnet-4.6` | ❌ not registered |
+
+`ask_ai` is registered only when the server has a `ZREAD_TOKEN` and is not running in direct mode.
 
 ## Usage Without a Zread.ai Account
 
