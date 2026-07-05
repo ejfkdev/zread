@@ -136,9 +136,8 @@ def _load_config() -> Dict[str, Any]:
 
     配置文件格式 (TOML):
         [zread]
-        token = "your-token-here"
-        lang = "zh"  # 可选，默认为 "zh"
-        model = "glm-5.1"  # 可选，默认为 "glm-5.1"
+        lang = "en"          # 可选，默认 "en"
+        github_token = ""    # 可选，提升 GitHub API 限额 / 访问私有仓库
     """
     config_path = _get_config_path()
     if not config_path:
@@ -154,36 +153,14 @@ def _load_config() -> Dict[str, Any]:
 
 _CONFIG_FROM_FILE: Dict[str, Any] = _load_config()
 
-# 硬编码 token（可选，优先级：命令行参数 > 环境变量 > 配置文件）
-# 使用 --no-token 参数可在无 token 模式下运行，只提供不需要 token 的功能
-_DEFAULT_TOKEN = os.environ.get("ZREAD_TOKEN", _CONFIG_FROM_FILE.get("token", ""))
-
-# 默认模型（优先级：环境变量 > 配置文件 > 代码默认值）
-_DEFAULT_MODEL = os.environ.get("ZREAD_MODEL", _CONFIG_FROM_FILE.get("model", "glm-5.1"))
-
-
-def _parse_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value).strip().lower() in ("1", "true", "yes", "on")
-
-
-# 直连模式：不访问 zread.ai，数据直接来自 GitHub
-# 优先级：--direct 参数 > ZREAD_DIRECT 环境变量 > 配置文件
-_DIRECT_MODE = _parse_bool(
-    os.environ.get("ZREAD_DIRECT", _CONFIG_FROM_FILE.get("direct", False))
-)
-
-# GitHub API Token（可选，仅直连模式使用，用于提升速率限制和访问私有仓库）
+# GitHub API Token（可选，用于提升速率限制和访问私有仓库）
+# 优先级：ZREAD_GITHUB_TOKEN > GITHUB_TOKEN > 配置文件
 _GITHUB_TOKEN = os.environ.get(
     "ZREAD_GITHUB_TOKEN",
     os.environ.get("GITHUB_TOKEN", _CONFIG_FROM_FILE.get("github_token", "")),
 )
 
-# 服务域名（可通过 ZREAD_BASE_URL 指向兼容的自建服务）
-BASE_URL = os.environ.get(
-    "ZREAD_BASE_URL", _CONFIG_FROM_FILE.get("base_url", "https://zread.ai")
-).rstrip("/")
+# 所有数据直接来自 GitHub，不依赖任何外部 SaaS
 GITHUB_API_URL = "https://api.github.com"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com"
 APP_NAME = "zread"
@@ -1121,21 +1098,18 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
     """Rich 格式输出文档搜索结果 (CLI 模式，保留 <em> 并高亮)"""
     console = Console()
 
-    # 构建 zread 基础 URL - 使用 owner/repo 格式
-    base_url = f"{BASE_URL}/{repo}" if repo else BASE_URL
-
     for result in results:
         title = result.get("title", "")
         slug = result.get("slug", "")
         # 提取 slug 序号
         slug_num = _extract_slug_number(slug)
         prefix = f"{slug_num}. " if slug_num else ""
-        # 构建页面链接
-        if _DIRECT_MODE and repo and "/" in repo:
+        # 构建 GitHub 文件链接
+        if repo and "/" in repo:
             owner_part, name_part = repo.split("/", 1)
             page_url = _page_url(owner_part, name_part, slug)
         else:
-            page_url = f"{base_url}/{slug}"
+            page_url = f"https://github.com/{repo}/blob/HEAD/{slug}"
 
         # 内容预览（保留 <em> 标签用于高亮）
         contents = []
@@ -1321,112 +1295,14 @@ def _resolve_lang(lang: Optional[str]) -> str:
     return lang if lang in ("zh", "en") else _DEFAULT_LANG
 
 
-def _http_get(
-    url: str,
-    lang: str = "zh",
-    error_msg: str = "请求失败",
-    params: Optional[dict] = None,
-    headers: Optional[dict] = None,
-    cookies: Optional[dict] = None,
-    timeout: int = 30,
-) -> Optional[dict]:
-    """通用 HTTP GET 请求函数，统一处理语言和错误
-
-    Args:
-        url: 请求 URL
-        lang: 语言，自动添加 x-locale header 和 cookie
-        error_msg: 错误提示信息（用于打印）
-        params: URL 查询参数
-        headers: 额外的请求头
-        cookies: 额外的 cookies
-        timeout: 超时时间（秒）
-
-    Returns:
-        API 响应的 data 字段，失败时返回 None
-    """
-    # 构建带语言设置的 headers 和 cookies
-    merged_headers = {**DEFAULT_HEADERS, "x-locale": lang}
-    if headers:
-        merged_headers.update(headers)
-
-    merged_cookies = {"x-locale": lang}
-    if cookies:
-        merged_cookies.update(cookies)
-
-    try:
-        response = httpx.get(
-            url,
-            params=params,
-            headers=merged_headers,
-            cookies=merged_cookies,
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0:
-            return result.get("data")
-        else:
-            print(f"{error_msg}: {result.get('msg', _unknown_error(lang))}")
-            return None
-    except httpx.RequestError as e:
-        print(tr("errors.network_error_with_context", lang, context=error_msg, error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(
-            tr("errors.json_parse_error_with_context", lang, context=error_msg, error=e)
-        )
-        return None
-
-
 # ==========================================
 # 核心功能函数
 # ==========================================
 
 
-def _get_token(token: Optional[str] = None, required: bool = True) -> Optional[str]:
-    """获取 token，优先级：传入参数 > 环境变量 > 硬编码
-
-    :param token: 可选的传入 token
-    :param required: 如果为 True 且没有 token，则抛出异常；如果为 False，则返回 None
-    """
-    if token:
-        return token
-    if _DEFAULT_TOKEN:
-        return _DEFAULT_TOKEN
-    if required:
-        raise ValueError("Token 未设置。请传入 token 参数，或设置 ZREAD_TOKEN 环境变量")
-    return None
-
-
-def set_default_token(token: str) -> None:
-    """设置默认 token（运行时修改）"""
-    global _DEFAULT_TOKEN
-    _DEFAULT_TOKEN = token
-
-
-def set_direct_mode(enabled: bool) -> None:
-    """设置直连模式（运行时修改，--direct 参数使用）"""
-    global _DIRECT_MODE
-    _DIRECT_MODE = enabled
-
-
-def _is_direct() -> bool:
-    """当前是否处于直连模式（不访问 zread.ai）"""
-    return _DIRECT_MODE
-
-
 def _page_url(owner: str, repo_name: str, slug: str) -> str:
-    """构建文档页面链接：zread 文档页 或 直连模式下的 GitHub 文件页"""
-    if _DIRECT_MODE:
-        return f"https://github.com/{owner}/{repo_name}/blob/HEAD/{slug}"
-    return f"{BASE_URL}/{owner}/{repo_name}/{slug}"
-
-
-def _get_model(model: Optional[str] = None) -> str:
-    """获取 AI 模型，优先级：传入参数 > 环境变量 > 配置文件 > 代码默认值。"""
-    if model:
-        return model
-    return _DEFAULT_MODEL
+    """构建文档页面链接（GitHub 文件页，slug 即仓库内文件路径）"""
+    return f"https://github.com/{owner}/{repo_name}/blob/HEAD/{slug}"
 
 
 def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
@@ -1436,7 +1312,6 @@ def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
     支持的格式:
         - owner/repo
         - owner/repo/file/path
-        - https://zread.ai/owner/repo
         - https://github.com/owner/repo
         - https://github.com/owner/repo/file/path
         - https://github.com/owner/repo/blob/branch/file.py
@@ -1450,8 +1325,7 @@ def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
             "owner": str,           # 仓库所有者
             "repo": str,            # 仓库名
             "repo_path": str,       # owner/repo 格式
-            "zread_url": str,       # https://zread.ai/owner/repo
-            "source": str,          # 来源类型: repo|zread|github|raw_github
+            "source": str,          # 来源类型: repo|github|raw_github
             "file_path": str|None,  # 文件路径（如果有）
             "start_line": int|None, # 起始行号
             "end_line": int|None,   # 结束行号
@@ -1469,7 +1343,6 @@ def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
         "owner": "",
         "repo": "",
         "repo_path": "",
-        "zread_url": "",
         "source": "repo",
         "file_path": None,
         "start_line": None,
@@ -1500,7 +1373,6 @@ def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
             result["repo"] = match.group(2)
             result["file_path"] = match.group(3)
             result["repo_path"] = f"{match.group(1)}/{match.group(2)}"
-            result["zread_url"] = f"{BASE_URL}/{result['repo_path']}"
             result["source"] = "raw_github"
             return result
 
@@ -1513,18 +1385,11 @@ def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
             result["repo"] = match.group(2)
             result["file_path"] = match.group(3)
             result["repo_path"] = f"{match.group(1)}/{match.group(2)}"
-            result["zread_url"] = f"{BASE_URL}/{result['repo_path']}"
             result["source"] = "github"
             return result
 
     # 移除域名前缀
-    if url.startswith("zread.ai/"):
-        url = url[9:]
-        result["source"] = "zread"
-    elif url.startswith("zread.com/"):
-        url = url[10:]
-        result["source"] = "zread"
-    elif url.startswith("github.com/"):
+    if url.startswith("github.com/"):
         url = url[11:]
         result["source"] = "github"
 
@@ -1534,7 +1399,6 @@ def parse_repo_url(url_or_path: str) -> Dict[str, Any]:
         result["owner"] = parts[0]
         result["repo"] = parts[1]
         result["repo_path"] = f"{parts[0]}/{parts[1]}"
-        result["zread_url"] = f"{BASE_URL}/{result['repo_path']}"
         # 剩余部分是文件路径
         if len(parts) > 2:
             result["file_path"] = "/".join(parts[2:])
@@ -1549,698 +1413,43 @@ def fetch_repo_outline(
     repo_url_or_path: str, lang: str = "zh"
 ) -> Optional[List[Dict[str, Any]]]:
     """
-    获取仓库文档目录（outline）
-    :param repo_url_or_path: 支持多种格式:
-        - https://zread.ai/owner/repo
-        - https://github.com/owner/repo
-        - owner/repo
+    获取仓库文档目录（outline）——仓库自带的 Markdown 文件列表
+
+    :param repo_url_or_path: 支持格式 owner/repo 或 https://github.com/owner/repo
     :param lang: 语言，可选 "zh" 或 "en"
-    :return: pages 列表，失败返回 None
+    :return: pages 列表（slug 即文件路径），失败返回 None
     """
-    if _DIRECT_MODE:
-        return _direct_repo_outline(repo_url_or_path, lang)
-
-    zread_url = parse_repo_url(repo_url_or_path)["zread_url"]
-
-    # 构建带 X-Locale 的 headers 和 cookies
-    headers = {**DEFAULT_HEADERS, "X-Locale": lang}
-    cookies = {"X-Locale": lang}
-
-    response = httpx.get(zread_url, headers=headers, cookies=cookies, timeout=30.0)
-    response.raise_for_status()
-    html = response.text
-
-    # HTML markers for extracting wiki data
-    _START_MARKER = '{\\"wiki\\":{\\"info\\":{\\"wiki_id\\":\\"'
-    _END_MARKER = ']\\n"])</script><script>self.__next_f.push'
-
-    start_pos = html.find(_START_MARKER)
-    if start_pos == -1:
-        return None
-
-    end_pos = html.find(_END_MARKER, start_pos)
-    if end_pos == -1:
-        return None
-
-    try:
-        json_str = html[start_pos:end_pos].replace('\\"', '"').replace("\\\\", "\\")
-        wiki_obj = json.loads(json_str)
-
-        def find_wiki_node(node):
-            if isinstance(node, dict):
-                if "wiki" in node and "info" in node["wiki"]:
-                    return node["wiki"]
-                for v in node.values():
-                    res = find_wiki_node(v)
-                    if res:
-                        return res
-            elif isinstance(node, list):
-                for item in node:
-                    res = find_wiki_node(item)
-                    if res:
-                        return res
-            return None
-
-        wiki_node = find_wiki_node(wiki_obj)
-        if not wiki_node:
-            return None
-
-        simplified_pages = []
-        for page in wiki_node.get("pages", []):
-            section = page.get("section", "")
-            group = page.get("group", "")
-            topic = page.get("topic", "")
-            parts = [p for p in [section, group, topic] if p]
-            title = "/".join(parts)
-
-            simplified_pages.append(
-                {
-                    "page_id": page.get("page_id"),
-                    "slug": page.get("slug"),
-                    "title": title,
-                    "topic": topic,
-                    "group": group,
-                    "section": section,
-                    "order": page.get("order"),
-                }
-            )
-
-        return simplified_pages
-
-    except json.JSONDecodeError as e:
-        print(tr("errors.parse_json_failed", error=e))
-        return None
-    except (KeyError, TypeError) as e:
-        print(tr("errors.parse_data_structure_failed", error=e))
-        return None
+    return _github_repo_outline(repo_url_or_path, lang)
 
 
 def fetch_markdown(repo_url_or_path: str, slug: str, lang: str = "zh") -> Optional[str]:
     """
-    获取 Markdown 正文
-    :param repo_url_or_path: 支持多种格式: owner/repo 或完整 URL
-    :param slug: 页面 slug
+    获取文档正文——slug 即仓库内 Markdown 文件路径
+
+    :param repo_url_or_path: 支持格式 owner/repo 或完整 URL
+    :param slug: 文件路径（"1-overview" 映射到 README）
     :param lang: 语言，默认 'zh'
     :return: Markdown 字符串 或 None
     """
-    if _DIRECT_MODE:
-        return _direct_fetch_markdown(repo_url_or_path, slug, lang)
-
-    zread_url = parse_repo_url(repo_url_or_path)["zread_url"]
-    url = f"{zread_url}/{slug}"
-
-    response = httpx.get(
-        url,
-        cookies={"X-Locale": lang},
-        headers={**DEFAULT_HEADERS, "RSC": "1"},
-        timeout=30.0,
-    )
-    response.raise_for_status()
-    content = response.content
-
-    # 倒着搜索 ",---" 第一次出现的位置
-    marker = b",---"
-    end_pos = content.rfind(marker)
-    if end_pos == -1:
-        return None
-
-    # 往前找 \n（换行符）
-    line_start = content.rfind(b"\n", 0, end_pos)
-    if line_start == -1:
-        line_start = 0  # 如果没有找到换行符，从开头开始
-    else:
-        line_start += 1  # 跳过换行符本身
-
-    # 提取中间的字符（如 81:T42bf,）
-    header_line = content[line_start : end_pos + 1].decode("latin-1")  # +1 包含逗号
-
-    # 用正则匹配出字节大小
-    head_pattern = re.compile(r"^([0-9a-f]+):T([0-9a-f]+),")
-    match = head_pattern.match(header_line)
-    if not match:
-        return None
-
-    try:
-        byte_length = int(match.group(2), 16)
-    except ValueError:
-        return None
-
-    # 计算内容开始位置（头部结束位置，即逗号后的位置）
-    header_end = line_start + match.end()
-
-    # 往后提取内容
-    try:
-        return content[header_end : header_end + byte_length].decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-
-
-def search_wiki(repo_url_or_path: str, query: str, lang: str = "zh") -> str:
-    """
-    搜索 Wiki 内容
-    :param repo_url_or_path: 支持多种格式: owner/repo 或完整 URL
-    :param query: 搜索词
-    :param lang: 语言，默认 'zh'
-    :return: 格式化结果字符串
-    """
-    status = fetch_repo_metadata(repo_url_or_path)
-    if not status or not status.get("wiki_id"):
-        return "no result"
-
-    wiki_id = status["wiki_id"]
-    search_url = f"{BASE_URL}/api/v1/wiki/{wiki_id}/search"
-
-    headers = {**DEFAULT_HEADERS, "x-locale": lang}
-    params = {"q": query}
-
-    try:
-        response = httpx.get(search_url, headers=headers, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("code") != 0 or not data.get("data"):
-            return "no result"
-
-        results = data["data"]
-        if not results:
-            return "no result"
-
-        formatted_results = []
-        for result in results:
-            lines = [f"# [{result.get('title', '')}]({result.get('slug', '')})"]
-            for match in result.get("matches", []):
-                text = match.get("highlight") or match.get("content", "")
-                text = re.sub(r"<[^>]+>", "", text).replace("\n", "  ")
-                text = re.sub(r" {3,}", "  ", text).strip()
-                if text:
-                    lines.append(text)
-            formatted_results.append("\n".join(lines))
-
-        return "\n\n".join(formatted_results) if formatted_results else "no result"
-
-    except httpx.RequestError as e:
-        print(tr("errors.search_wiki_network_failed", lang, error=e))
-        return "no result"
-    except json.JSONDecodeError as e:
-        print(tr("errors.search_wiki_parse_failed", lang, error=e))
-        return "no result"
+    return _github_fetch_markdown(repo_url_or_path, slug, lang)
 
 
 def _search_wiki_raw(repo_url_or_path: str, query: str) -> Optional[List[Dict]]:
-    """搜索 Wiki 并返回原始数据（MCP JSON 用）"""
-    if _DIRECT_MODE:
-        results = _direct_search_wiki(repo_url_or_path, query, _DEFAULT_LANG)
-        if results is None:
-            return None
-        return [
-            {
-                "title": r.get("title", ""),
-                "slug": r.get("slug", ""),
-                "matches": [
-                    re.sub(r"<[^>]+>", "", m.get("content", ""))
-                    for m in r.get("matches", [])
-                ],
-            }
-            for r in results
-        ]
-
-    status = fetch_repo_metadata(repo_url_or_path)
-    if not status or not status.get("wiki_id"):
+    """搜索仓库文档（grep 仓库内 Markdown 文件），返回原始数据（MCP JSON 用）"""
+    results = _github_search_docs(repo_url_or_path, query, _DEFAULT_LANG)
+    if results is None:
         return None
-
-    wiki_id = status["wiki_id"]
-    search_url = f"{BASE_URL}/api/v1/wiki/{wiki_id}/search"
-
-    headers = {**DEFAULT_HEADERS, "x-locale": _DEFAULT_LANG}
-    params = {"q": query}
-
-    try:
-        response = httpx.get(search_url, headers=headers, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-
-        if data.get("code") != 0 or not data.get("data"):
-            return None
-
-        results = data["data"]
-        if not results:
-            return []
-
-        items = []
-        for r in results:
-            matches = []
-            for m in r.get("matches", []):
-                text = m.get("highlight") or m.get("content", "")
-                text = re.sub(r"<[^>]+>", "", text).replace("\n", "  ")
-                text = re.sub(r" {3,}", "  ", text).strip()
-                if text:
-                    matches.append(text)
-            items.append({"title": r.get("title", ""), "slug": r.get("slug", ""), "matches": matches})
-        return items
-
-    except (httpx.RequestError, json.JSONDecodeError):
-        return None
-
-
-def create_talk(token: Optional[str] = None, lang: str = "zh") -> Optional[str]:
-    """
-    创建 AI 对话
-    :param token: 可选，Bearer Token
-    :param lang: 语言，默认 'zh'
-    :return: talk_id 或 None
-    """
-    token = _get_token(token)
-    url = f"{BASE_URL}/api/v1/talk"
-    headers = {
-        **DEFAULT_HEADERS,
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-        "x-locale": lang,
-    }
-    data = {"query": " "}
-
-    try:
-        response = httpx.post(url, headers=headers, json=data, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0 and result.get("data"):
-            return result["data"].get("talk_id")
-        else:
-            print(
-                tr(
-                    "errors.create_talk_failed_with_reason",
-                    lang,
-                    detail=result.get("msg", _unknown_error(lang)),
-                )
-            )
-            return None
-    except httpx.RequestError as e:
-        print(tr("errors.create_talk_network_failed", lang, error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(tr("errors.create_talk_parse_failed", lang, error=e))
-        return None
-
-
-async def send_message_async(
-    talk_id: str,
-    query: str,
-    wiki_id: str,
-    page_id: str,
-    repo_id: Optional[str] = None,
-    token: Optional[str] = None,
-    model: Optional[str] = None,
-    lang: str = "zh",
-):
-    """
-    异步发送消息并流式获取 AI 回复
-
-    事件类型说明：
-    - answer: 流式 chunk，data 里有 reasoning_content 和 text
-    - round_finish: 一段正文（由多个 answer text 拼起来的完整句子）
-    - finish: 所有话都传完毕了，会话结束
-
-    Yields:
-        dict: {"event": "answer"|"round_finish", "reasoning_content": str, "text": str}
-
-    :param model: 'glm-5.1' (默认) 或 'claude-sonnet-4.6'，可通过 ZREAD_MODEL 环境变量或配置文件设置
-    """
-    token = _get_token(token)
-    model = _get_model(model)
-    url = f"{BASE_URL}/api/v1/talk/{talk_id}/message"
-    headers = {
-        **DEFAULT_HEADERS,
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-        "x-locale": lang,
-        "Accept": "text/event-stream",
-    }
-    context = {
-        "wiki": {"page_id": page_id, "wiki_id": wiki_id},
-    }
-    if repo_id:
-        context["repo"] = {"repo_id": repo_id}
-    data = {
-        "parent_message_id": "",
-        "query": query,
-        "context": context,
-        "model": model,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0)) as client:
-            async with client.stream(
-                "POST", url, headers=headers, json=data
-            ) as response:
-                response.raise_for_status()
-
-                current_event = None
-
-                async for line in response.aiter_lines():
-                    line = line.strip()
-
-                    if not line:
-                        continue
-
-                    # 解析 event 行
-                    if line.startswith("event:"):
-                        current_event = line[6:].strip()
-                        if current_event == "finish":
-                            # 所有话都传完毕了
-                            break
-                    # 解析 data 行
-                    elif line.startswith("data:"):
-                        data_str = line[5:].strip()
-
-                        try:
-                            event_data = json.loads(data_str)
-                            chunk_reasoning = event_data.get("reasoning_content", "")
-                            chunk_text = event_data.get("text", "")
-
-                            if current_event == "answer":
-                                # 流式 chunk，yield 出去
-                                if chunk_reasoning or chunk_text:
-                                    yield {
-                                        "event": "answer",
-                                        "reasoning_content": chunk_reasoning,
-                                        "text": chunk_text,
-                                    }
-                            elif current_event == "round_finish":
-                                # 完整的句子（由多个 answer text 拼起来）
-                                if chunk_reasoning or chunk_text:
-                                    yield {
-                                        "event": "round_finish",
-                                        "reasoning_content": chunk_reasoning,
-                                        "text": chunk_text,
-                                    }
-                            elif current_event == "error":
-                                # API 返回错误
-                                yield {
-                                    "event": "error",
-                                    "text": event_data.get(
-                                        "text", _unknown_error(lang)
-                                    ),
-                                    "reasoning_content": "",
-                                }
-                                return
-                        except json.JSONDecodeError:
-                            continue
-
-    except Exception as e:
-        error_msg = tr("errors.send_message_async_failed", lang, error=e)
-        print(error_msg)
-        yield {"event": "error", "text": error_msg, "reasoning_content": ""}
-
-
-async def send_repo_message_async(
-    talk_id: str,
-    repo_path: str,
-    query: str,
-    token: Optional[str] = None,
-    model: Optional[str] = None,
-    lang: str = "zh",
-    wiki_id: Optional[str] = None,
-    page_id: Optional[str] = None,
-    repo_id: Optional[str] = None,
-):
-    """
-    异步发送消息到仓库 AI（自动获取 page_id）
-
-    Args:
-        talk_id: 对话 ID
-        repo_path: 仓库路径，如 "facebook/react"
-        query: 用户问题
-        token: 可选的 token
-        model: 模型名称
-        lang: 语言
-        wiki_id: 可选，已获取的 wiki_id
-        page_id: 可选，已获取的 page_id
-        repo_id: 可选，已获取的 repo_id
-
-    Yields:
-        dict: {"event": "answer"|"round_finish"|"error", "reasoning_content": str, "text": str}
-    """
-    model = _get_model(model)
-    # 如果缺少上下文，则统一补齐
-    if wiki_id is None or repo_id is None or page_id is None:
-        wiki_id_value, page_id_value, repo_id_value, error_message = (
-            _get_repo_ai_context(repo_path, lang)
-        )
-        if error_message:
-            yield {
-                "event": "error",
-                "text": error_message.replace(
-                    tr("errors.error_prefix", lang) + " ", "", 1
-                ),
-                "reasoning_content": "",
-            }
-            return
-        if wiki_id is None:
-            wiki_id = wiki_id_value
-        if repo_id is None:
-            repo_id = repo_id_value
-        if page_id is None:
-            page_id = page_id_value
-
-    # 调用底层 send_message_async
-    async for chunk in send_message_async(
-        talk_id, query, wiki_id, page_id, repo_id, token, model, lang
-    ):
-        yield chunk
-
-
-def _collect_ai_chunk(
-    chunk: Any,
-    reasoning_parts: List[str],
-    text_parts: List[str],
-    *,
-    include_round_finish: bool = True,
-) -> Optional[str]:
-    """统一收集 AI 流式分片，返回错误信息（如有）。"""
-    if not isinstance(chunk, dict) or "event" not in chunk:
-        return None
-
-    event_type = chunk.get("event")
-    if event_type == "error":
-        return chunk.get("text", _unknown_error(_DEFAULT_LANG))
-
-    if event_type == "answer" or (
-        include_round_finish and event_type == "round_finish"
-    ):
-        if chunk.get("reasoning_content"):
-            reasoning_parts.append(chunk["reasoning_content"])
-        if chunk.get("text"):
-            text_parts.append(chunk["text"])
-
-    return None
-
-
-def _merge_live_ai_chunk(
-    chunk: Any, reasoning_text: str, answer_text: str
-) -> tuple[str, str]:
-    """统一合并 Live 模式下的 AI 分片。"""
-    reasoning_parts: List[str] = []
-    text_parts: List[str] = []
-    _collect_ai_chunk(chunk, reasoning_parts, text_parts, include_round_finish=False)
-
-    if reasoning_parts:
-        reasoning_text += "".join(reasoning_parts)
-        reasoning_text = re.sub(r"\n{2,}", "\n", reasoning_text)
-    if text_parts:
-        answer_text += "".join(text_parts)
-
-    return reasoning_text, answer_text
-
-
-def _get_repo_ai_context(
-    repo_path: str, lang: str = "zh"
-) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
-    """获取仓库 AI 所需上下文，返回 (wiki_id, page_id, repo_id, error_message)。"""
-    if _DIRECT_MODE:
-        return None, None, None, tr("errors.ai_direct_mode", lang)
-
-    metadata = fetch_repo_metadata(repo_path)
-    unavailable_message = _get_ai_unavailable_message(
-        parse_repo_url(repo_path)["repo_path"], metadata
-    )
-    if unavailable_message:
-        return None, None, None, unavailable_message
-
-    if not metadata:
-        return None, None, None, tr("errors.fetch_repo_status", lang)
-
-    wiki_id = metadata.get("wiki_id")
-    repo_id = metadata.get("repo_id")
-    if not wiki_id:
-        return None, None, None, tr("errors.repo_missing_docs", lang)
-
-    outline = fetch_repo_outline(repo_path, lang=lang)
-    if not outline:
-        return None, None, None, tr("errors.repo_has_no_pages", lang)
-
-    page_id = outline[0].get("page_id", "")
-    return wiki_id, page_id, repo_id, None
-
-
-async def _await_with_status(console: Console, message: str, awaitable: Any) -> Any:
-    """在 Rich Status 中等待异步结果。"""
-    from rich.status import Status
-
-    with Status(message, spinner="dots", console=console):
-        return await awaitable
-
-
-async def _get_first_async_chunk_with_status(
-    console: Console, message: str, async_iter: Any
-) -> tuple[Any, Optional[Any]]:
-    """等待异步迭代器首个可展示分片，返回 (iterator, first_chunk)。"""
-    from rich.status import Status
-
-    iterator = async_iter.__aiter__()
-    with Status(message, spinner="dots", console=console):
-        while True:
-            try:
-                chunk = await iterator.__anext__()
-            except StopAsyncIteration:
-                return iterator, None
-
-            if not isinstance(chunk, dict):
-                continue
-            if chunk.get("event") == "error":
-                return iterator, chunk
-            if chunk.get("reasoning_content") or chunk.get("text"):
-                return iterator, chunk
-
-
-def send_message(
-    talk_id: str,
-    query: str,
-    wiki_id: str,
-    page_id: str,
-    repo_id: Optional[str] = None,
-    token: Optional[str] = None,
-    model: Optional[str] = None,
-    lang: str = "zh",
-) -> Optional[str]:
-    """
-    发送消息并获取 AI 回复（同步版本，调用异步版本）
-    :param model: 'glm-5.1' (默认) 或 'claude-sonnet-4.6'，可通过 ZREAD_MODEL 环境变量或配置文件设置
-    :return: AI 回复文本（收集所有 round_finish 的内容）
-    """
-    model = _get_model(model)
-    import asyncio
-
-    full_text = []
-
-    async def collect_result():
-        async for item in send_message_async(
-            talk_id, query, wiki_id, page_id, repo_id, token, model, lang
-        ):
-            if not isinstance(item, dict) or "event" not in item:
-                continue
-
-            event_type = item.get("event")
-            if event_type == "error":
-                continue
-            # 收集正文内容：
-            # - round_finish: 完整段落总结
-            # - answer 的 text: 正文片段（不包括 reasoning_content 思考内容）
-            if event_type == "round_finish" and item.get("text"):
-                full_text.append(item["text"])
-            elif event_type == "answer" and item.get("text"):
-                full_text.append(item["text"])
-
-    # 运行异步收集器
-    try:
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            asyncio.run(collect_result())
-        else:
-            thread_error: List[BaseException] = []
-
-            def _run_in_thread() -> None:
-                try:
-                    asyncio.run(collect_result())
-                except BaseException as exc:
-                    thread_error.append(exc)
-
-            thread = threading.Thread(target=_run_in_thread)
-            thread.start()
-            thread.join()
-            if thread_error:
-                raise thread_error[0]
-    except Exception as e:
-        print(f"收集消息结果失败: {e}")
-        return None
-
-    # MCP 只需要正文（text），返回完整的 text
-    result_text = "\n".join(full_text)
-    return result_text if result_text else None
-
-
-def delete_talk(talk_id: str, token: Optional[str] = None) -> bool:
-    """
-    删除对话
-    :param talk_id: 对话 ID
-    :param token: 可选，Bearer Token
-    :return: 是否成功
-    """
-    token = _get_token(token)
-    url = f"{BASE_URL}/api/v1/talk/{talk_id}"
-    headers = {**DEFAULT_HEADERS, "Authorization": f"Bearer {token}"}
-
-    try:
-        response = httpx.delete(url, headers=headers, timeout=30)
-        return response.status_code < 300
-    except httpx.RequestError as e:
-        print(f"删除对话网络请求失败: {e}")
-        return False
-
-
-def chat_with_ai(
-    repo_url_or_path: str,
-    query: str,
-    token: Optional[str] = None,
-    model: Optional[str] = None,
-    lang: str = "zh",
-) -> str:
-    """
-    完整的 AI 对话流程
-    :param repo_url_or_path: 支持多种格式: owner/repo 或完整 URL
-    :param query: 用户问题
-    :param token: 可选，Bearer Token
-    :param model: 模型，默认 'glm-5.1'，可通过 ZREAD_MODEL 环境变量或配置文件设置
-    :param lang: 语言，默认 'zh'
-    :return: AI 回复文本
-    """
-    token = _get_token(token)
-    model = _get_model(model)
-
-    wiki_id, page_id, repo_id, error_message = _get_repo_ai_context(
-        repo_url_or_path, lang
-    )
-    if error_message:
-        return error_message.replace("错误: ", "", 1)
-
-    talk_id = create_talk(token=token, lang=lang)
-    if not talk_id:
-        return "创建对话失败"
-
-    try:
-        answer = send_message(
-            talk_id,
-            query,
-            wiki_id,
-            page_id,
-            repo_id,
-            token=token,
-            model=model,
-            lang=lang,
-        )
-        return answer if answer else "未获取到 AI 回复"
-    finally:
-        delete_talk(talk_id, token=token)
+    return [
+        {
+            "title": r.get("title", ""),
+            "slug": r.get("slug", ""),
+            "matches": [
+                re.sub(r"<[^>]+>", "", m.get("content", ""))
+                for m in r.get("matches", [])
+            ],
+        }
+        for r in results
+    ]
 
 
 def recommend_repos(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any]]:
@@ -2250,217 +1459,24 @@ def recommend_repos(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any
     :param lang: 语言，可选 "zh" 或 "en"
     :return: dict 包含 topics 和 repos，或 None
     """
-    if _DIRECT_MODE:
-        return _direct_recommend(topic, lang)
-
-    url = f"{BASE_URL}/api/v1/repo/recommend"
-    params = {"topic": topic} if topic else {}
-    headers = {**DEFAULT_HEADERS, "X-Locale": lang}
-    cookies = {"X-Locale": lang}
-
-    try:
-        response = httpx.get(
-            url, headers=headers, cookies=cookies, params=params, timeout=30
-        )
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0:
-            return result.get("data")
-        else:
-            print(
-                tr(
-                    "errors.recommend_failed_with_reason",
-                    lang,
-                    detail=result.get("msg", _unknown_error(lang)),
-                )
-            )
-            return None
-    except httpx.RequestError as e:
-        print(tr("errors.recommend_network_failed", lang, error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(tr("errors.recommend_parse_failed", lang, error=e))
-        return None
+    return _github_recommend(topic, lang)
 
 
 def _search_repos_api(query: str, lang: str = "zh") -> Optional[List[Dict[str, Any]]]:
-    """
-    模糊搜索仓库
-    :param query: 搜索词
-    :param lang: 语言，默认 'zh'
-    :return: list 仓库列表，或 None
-    """
-    if _DIRECT_MODE:
-        return _direct_search_repos(query, lang)
-
-    url = f"{BASE_URL}/api/v1/repo"
-    params = {"q": query}
-    headers = {**DEFAULT_HEADERS, "x-locale": lang}
-
-    try:
-        response = httpx.get(url, headers=headers, params=params, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0:
-            return result.get("data", [])
-        else:
-            print(
-                tr(
-                    "errors.search_repo_failed_with_reason",
-                    lang,
-                    detail=result.get("msg", _unknown_error(lang)),
-                )
-            )
-            return None
-    except httpx.RequestError as e:
-        print(tr("errors.search_repo_network_failed", lang, error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(tr("errors.search_repo_parse_failed", lang, error=e))
-        return None
+    """模糊搜索仓库（GitHub 搜索 API）"""
+    return _github_search_repos(query, lang)
 
 
 def get_trending_repos(lang: str = "zh") -> Optional[List[Dict[str, Any]]]:
-    """
-    获取每周热榜（按周分组返回）
-    :param lang: 语言，可选 "zh" 或 "en"
-    :return: list 分组数组，每项包含 title/time_span/repos
-    """
-    if _DIRECT_MODE:
-        return _direct_trending(lang)
-
-    url = f"{BASE_URL}/api/v1/public/repo/trending"
-    headers = {**DEFAULT_HEADERS, "X-Locale": lang}
-    cookies = {"X-Locale": lang}
-
-    try:
-        response = httpx.get(url, headers=headers, cookies=cookies, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0:
-            return result.get("data", [])
-        else:
-            print(f"获取热榜失败: {result.get('msg', '未知错误')}")
-            return None
-    except httpx.RequestError as e:
-        print(f"获取热榜网络请求失败: {e}")
-        return None
-    except json.JSONDecodeError as e:
-        print(f"获取热榜响应解析失败: {e}")
-        return None
+    """获取每周热榜（GitHub 上按周新建、按星标排序）"""
+    return _github_trending(lang)
 
 
 def _get_repo_info(owner_or_path: str, lang: str = "zh") -> Optional[Dict[str, Any]]:
-    """
-    查看仓库信息和状态
-    :param owner_or_path: 仓库路径 (owner/repo 格式)
-    :param lang: 语言，可选 "zh" 或 "en"
-    :return: dict 仓库信息，或 None
-    """
-    # 解析 owner/repo 格式
+    """查看仓库信息（GitHub 仓库 API）"""
     if "/" not in owner_or_path:
         raise ValueError(tr("errors.invalid_repo_format"))
-
-    if _DIRECT_MODE:
-        return _direct_repo_metadata(owner_or_path, lang)
-
-    parts = owner_or_path.split("/")
-    owner = parts[0]
-    name = parts[1]
-
-    url = f"{BASE_URL}/api/v1/repo/github/{owner}/{name}"
-    headers = {**DEFAULT_HEADERS, "X-Locale": lang}
-    cookies = {"X-Locale": lang}
-
-    try:
-        response = httpx.get(url, headers=headers, cookies=cookies, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0:
-            return result.get("data")
-        else:
-            print(
-                tr(
-                    "errors.get_repo_info_failed_with_reason",
-                    lang,
-                    detail=result.get("msg", _unknown_error(lang)),
-                )
-            )
-            return None
-    except httpx.RequestError as e:
-        print(tr("errors.get_repo_info_network_failed", lang, error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(tr("errors.get_repo_info_parse_failed", lang, error=e))
-        return None
-
-
-def submit_repo(
-    name_or_path: str,
-    notification_email: str = "example@zread.ai",
-    token: Optional[str] = None,
-) -> Optional[Dict[str, Any]]:
-    """
-    提交索引
-    :param name_or_path: 仓库 URL 或路径（支持 github.com/owner/repo 或 owner/repo）
-    :param notification_email: 可选的通知邮箱
-    :param token: 可选，Bearer Token，未配置则静默跳过
-    :return: dict 提交结果，或 None
-    """
-    if _DIRECT_MODE:
-        return None
-    token = _get_token(token, required=False)
-    if not token:
-        return None
-    url = f"{BASE_URL}/api/v1/public/repo/submit"
-    headers = {
-        **DEFAULT_HEADERS,
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {token}",
-    }
-    data = {"name_or_path": name_or_path}
-    if notification_email:
-        data["notification_email"] = notification_email
-
-    try:
-        response = httpx.post(url, headers=headers, json=data, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") == 0:
-            return result.get("data")
-        else:
-            print(
-                tr(
-                    "errors.submit_repo_failed_with_reason",
-                    detail=result.get("msg", _unknown_error()),
-                )
-            )
-            return None
-    except httpx.RequestError as e:
-        print(tr("errors.submit_repo_network_failed", error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(tr("errors.submit_repo_parse_failed", error=e))
-        return None
-
-
-def refresh_repo(repo_id: str) -> bool:
-    """
-    请求刷新索引
-    :param repo_id: 仓库 ID
-    :return: 是否成功
-    """
-    if _DIRECT_MODE:
-        return False
-    url = f"{BASE_URL}/api/v1/repo/{repo_id}/refresh"
-    headers = {**DEFAULT_HEADERS, "Content-Type": "application/json"}
-
-    try:
-        response = httpx.post(url, headers=headers, json="", timeout=30)
-        return response.status_code < 300
-    except httpx.RequestError as e:
-        print(tr("errors.refresh_repo_network_failed", error=e))
-        return False
+    return _github_repo_metadata(owner_or_path, lang)
 
 
 def fetch_repo_files_with_meta(
@@ -2471,141 +1487,14 @@ def fetch_repo_files_with_meta(
     token: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    获取仓库内的文件内容及其元数据
+    获取仓库内的文件内容及其元数据（raw.githubusercontent + 本地行号截取）
 
     :return: 包含 content, total_lines, size 等信息的字典，失败返回 None
     """
-    if _DIRECT_MODE:
-        return _direct_fetch_file_meta(
-            repo_path, file_path, start_line, end_line, _DEFAULT_LANG
-        )
+    return _github_fetch_file_meta(
+        repo_path, file_path, start_line, end_line, _DEFAULT_LANG
+    )
 
-    # 通过 repo_path 获取 repo_id
-    parsed = parse_repo_url(repo_path)
-    owner, repo = parsed["owner"], parsed["repo"]
-    repo_info = _get_repo_info(f"{owner}/{repo}")
-    if not repo_info:
-        print(tr("errors.fetch_repo_info_for_file_failed", repo=repo_path))
-        return None
-
-    repo_id = repo_info.get("repo_id")
-    if not repo_id:
-        print(tr("errors.repo_info_missing_repo_id"))
-        return None
-
-    token = _get_token(token, required=False)
-    url = f"{BASE_URL}/api/v1/repo/{repo_id}/files"
-    headers = {
-        **DEFAULT_HEADERS,
-        "Content-Type": "application/json",
-    }
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    file_item = {"path": file_path}
-    if start_line is not None:
-        file_item["start_line"] = start_line
-    if end_line is not None:
-        file_item["end_line"] = end_line
-    data = {"files": [file_item]}
-
-    try:
-        response = httpx.post(url, headers=headers, json=data, timeout=30)
-        response.raise_for_status()
-        result = response.json()
-
-        if result.get("code") != 0:
-            print(
-                tr(
-                    "errors.fetch_file_failed_with_reason",
-                    detail=result.get("msg", _unknown_error()),
-                )
-            )
-            return None
-
-        files_data = result.get("data", [])
-        if not files_data:
-            print(tr("errors.file_not_found_or_inaccessible"))
-            return None
-
-        file_info = files_data[0]
-
-        # 获取元数据
-        total_size = file_info.get("size", 0)
-        full_content = file_info.get("content", "")
-        total_lines = len(full_content.split("\n")) if full_content else 0
-
-        # 如果有 snippet 字段，优先使用 snippet 的内容
-        snippet = file_info.get("snippet")
-        if snippet and isinstance(snippet, dict):
-            snippet_content = snippet.get("content")
-            if snippet_content is not None:
-                return {
-                    "content": snippet_content,
-                    "total_lines": total_lines,
-                    "size": total_size,
-                    "file_path": file_path,
-                    "start_line": snippet.get("start_line"),
-                    "end_line": snippet.get("end_line"),
-                    "is_snippet": True,
-                }
-
-        # 回退：使用 content 字段自行切割
-        content = full_content
-
-        # 如果没有指定行号范围，返回完整内容
-        if start_line is None and end_line is None:
-            return {
-                "content": content,
-                "total_lines": total_lines,
-                "size": total_size,
-                "file_path": file_path,
-                "start_line": 1,
-                "end_line": total_lines,
-                "is_snippet": False,
-            }
-
-        # 按行分割
-        lines = content.split("\n")
-
-        # 处理行号参数（转换为 0-based 索引）
-        # 注意：end_line 是包含的（inclusive）
-        start_idx = 0
-        end_idx = len(lines)
-
-        if start_line is not None:
-            start_idx = max(0, start_line - 1)
-
-        if end_line is not None:
-            end_idx = min(len(lines), end_line)
-
-        # 确保范围有效
-        if start_idx >= end_idx:
-            selected_content = ""
-            actual_end_line = start_line
-        else:
-            selected_lines = lines[start_idx:end_idx]
-            selected_content = "\n".join(selected_lines)
-            actual_end_line = end_line if end_line else len(lines)
-
-        return {
-            "content": selected_content,
-            "total_lines": total_lines,
-            "size": total_size,
-            "file_path": file_path,
-            "start_line": start_line if start_line else 1,
-            "end_line": actual_end_line,
-            "is_snippet": False,
-        }
-
-    except httpx.RequestError as e:
-        print(tr("errors.fetch_file_network_failed", error=e))
-        return None
-    except json.JSONDecodeError as e:
-        print(tr("errors.fetch_file_parse_failed", error=e))
-        return None
-    except (KeyError, IndexError) as e:
-        print(tr("errors.fetch_file_data_parse_failed", error=e))
-        return None
 
 
 def fetch_repo_files(
@@ -2618,7 +1507,7 @@ def fetch_repo_files(
     """
     获取仓库内的文件内容（兼容 MCP 的简化接口）
 
-    :param repo_path: 仓库路径，支持格式: owner/repo, https://zread.ai/owner/repo, https://github.com/owner/repo
+    :param repo_path: 仓库路径，支持格式: owner/repo 或 https://github.com/owner/repo
     :param file_path: 文件路径，如 "src/config.ts"
     :param start_line: 可选，开始行号（包含），从 1 开始计数
     :param end_line: 可选，结束行号（包含）
@@ -2642,10 +1531,10 @@ def fetch_repo_files(
 
 
 # ==========================================
-# 直连模式：数据直接来自 GitHub，不依赖 zread.ai
+# GitHub 数据层：所有数据直接来自 GitHub
 # ==========================================
 
-# 直连模式下作为"文档"的文件扩展名
+# 作为"文档"的文件扩展名
 _GH_DOC_EXTENSIONS = (".md", ".mdx", ".markdown", ".rst")
 # 大纲最多收录的文档文件数量（防止超大仓库刷屏）
 _GH_DOC_TREE_LIMIT = 500
@@ -2801,10 +1690,10 @@ def _gh_doc_tree(owner: str, repo: str, lang: str = "zh") -> Optional[List[str]]
     return result
 
 
-def _direct_repo_outline(
+def _github_repo_outline(
     repo_url_or_path: str, lang: str = "zh"
 ) -> Optional[List[Dict[str, Any]]]:
-    """直连模式大纲：仓库自带的文档文件列表（slug = 文件路径）"""
+    """仓库文档大纲：仓库自带的 Markdown 文件列表（slug = 文件路径）"""
     parsed = parse_repo_url(repo_url_or_path)
     owner, repo = parsed["owner"], parsed["repo"]
     tree = _gh_doc_tree(owner, repo, lang)
@@ -2830,10 +1719,10 @@ def _direct_repo_outline(
     return pages
 
 
-def _direct_fetch_markdown(
+def _github_fetch_markdown(
     repo_url_or_path: str, slug: str, lang: str = "zh"
 ) -> Optional[str]:
-    """直连模式读取文档：slug 即仓库内文件路径；默认 slug 映射到 README"""
+    """读取文档：slug 即仓库内文件路径；默认 slug 映射到 README"""
     parsed = parse_repo_url(repo_url_or_path)
     owner, repo = parsed["owner"], parsed["repo"]
     if slug == "1-overview":
@@ -2845,10 +1734,10 @@ def _direct_fetch_markdown(
     return _gh_fetch_raw(owner, repo, slug, lang)
 
 
-def _direct_search_wiki(
+def _github_search_docs(
     repo_url_or_path: str, query: str, lang: str = "zh"
 ) -> Optional[List[Dict[str, Any]]]:
-    """直连模式文档搜索：下载文档文件后按行匹配关键词"""
+    """文档搜索：下载仓库 Markdown 文件后按行匹配关键词"""
     parsed = parse_repo_url(repo_url_or_path)
     owner, repo = parsed["owner"], parsed["repo"]
     tree = _gh_doc_tree(owner, repo, lang)
@@ -2884,10 +1773,10 @@ def _direct_search_wiki(
     return results
 
 
-def _direct_search_repos(
+def _github_search_repos(
     query: str, lang: str = "zh"
 ) -> Optional[List[Dict[str, Any]]]:
-    """直连模式仓库搜索：GitHub search API"""
+    """仓库搜索：GitHub search API"""
     data = _gh_api_get(
         "/search/repositories",
         params={"q": query, "per_page": 10},
@@ -2898,8 +1787,8 @@ def _direct_search_repos(
     return [_gh_repo_item(item) for item in data.get("items", [])]
 
 
-def _direct_trending(lang: str = "zh", weeks: int = 4) -> Optional[List[Dict[str, Any]]]:
-    """直连模式热榜：按周查询 GitHub 上新建且星标最多的仓库"""
+def _github_trending(lang: str = "zh", weeks: int = 4) -> Optional[List[Dict[str, Any]]]:
+    """热榜：按周查询 GitHub 上新建且星标最多的仓库"""
     groups: List[Dict[str, Any]] = []
     now = arrow.utcnow()
     for offset in range(max(1, weeks)):
@@ -2926,8 +1815,8 @@ def _direct_trending(lang: str = "zh", weeks: int = 4) -> Optional[List[Dict[str
     return groups or None
 
 
-def _direct_recommend(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any]]:
-    """直连模式随机推荐：GitHub search 结果中随机抽取"""
+def _github_recommend(topic: str = "", lang: str = "zh") -> Optional[Dict[str, Any]]:
+    """随机推荐：GitHub search 结果中随机抽取"""
     import random
 
     query = f"topic:{topic} stars:>100" if topic else "stars:>5000"
@@ -2949,10 +1838,10 @@ def _direct_recommend(topic: str = "", lang: str = "zh") -> Optional[Dict[str, A
     return {"topics": [topic] if topic else [], "repos": items[:10]}
 
 
-def _direct_repo_metadata(
+def _github_repo_metadata(
     repo_url_or_path: str, lang: str = "zh"
 ) -> Optional[Dict[str, Any]]:
-    """直连模式仓库信息：GitHub repos API 映射为 zread 元数据格式"""
+    """仓库信息：GitHub repos API 映射为通用元数据格式"""
     parsed = parse_repo_url(repo_url_or_path)
     owner, repo = parsed["owner"], parsed["repo"]
     gh = _gh_repo_get(owner, repo, lang)
@@ -2960,7 +1849,7 @@ def _direct_repo_metadata(
         return {"_error": "not_found"}
 
     item = _gh_repo_item(gh)
-    # 直连模式没有收录/索引概念，标记为可用避免误报"未收录"
+    # 无收录/索引概念，标记为可用
     item["status"] = "success"
     pushed_at = gh.get("pushed_at")
     if pushed_at:
@@ -2974,14 +1863,14 @@ def _direct_repo_metadata(
     return item
 
 
-def _direct_fetch_file_meta(
+def _github_fetch_file_meta(
     repo_path: str,
     file_path: str,
     start_line: Optional[int] = None,
     end_line: Optional[int] = None,
     lang: str = "zh",
 ) -> Optional[Dict[str, Any]]:
-    """直连模式读取文件：raw.githubusercontent + 本地行号截取"""
+    """读取文件：raw.githubusercontent + 本地行号截取"""
     parsed = parse_repo_url(repo_path)
     owner, repo = parsed["owner"], parsed["repo"]
     content = _gh_fetch_raw(owner, repo, file_path, lang)
@@ -3024,185 +1913,46 @@ def _direct_fetch_file_meta(
 
 
 def run_tests():
-    """运行所有测试"""
+    """GitHub 功能冒烟测试（无需任何账号 / token）"""
     print("\n" + "=" * 70)
-    print("开始测试所有功能")
+    print("zread standalone smoke test (GitHub only)")
     print("=" * 70)
 
-    # 测试仓库路径
     TEST_REPO = "openclaw/openclaw"
 
-    # 1. 测试 URL 解析
-    print("\n[测试 1/13] URL 解析 (_parse_repo_url)")
-    try:
-        test_urls = [
-            "https://zread.ai/openclaw/openclaw",
-            "https://github.com/openclaw/openclaw",
-            "openclaw/openclaw",
-        ]
-        for url in test_urls:
-            parsed = parse_repo_url(url)
-            assert parsed["owner"] == "openclaw" and parsed["repo"] == "openclaw", (
-                f"解析失败: {url}"
-            )
-        print("  ✓ 通过 - 所有 URL 格式解析正确")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
+    print("\n[1/6] parse_repo_url")
+    parsed = parse_repo_url("https://github.com/openclaw/openclaw/blob/main/README.md#L1-L5")
+    assert parsed["owner"] == "openclaw" and parsed["repo"] == "openclaw"
+    assert parsed["file_path"] == "README.md" and parsed["start_line"] == 1
+    print("  ok")
 
-    # 2. 测试获取 outline
-    print("\n[测试 2/13] 获取文档目录 (fetch_repo_outline)")
-    try:
-        outline = fetch_repo_outline(TEST_REPO)
-        if outline:
-            print(f"  ✓ 通过 - 获取到 {len(outline)} 个页面")
-            if outline:
-                print(f"    第一个页面: {outline[0].get('title', 'N/A')}")
-        else:
-            print("  ✗ 失败 - 无法获取文档目录（请检查 start_marker 和 end_marker）")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
+    print("\n[2/6] fetch_repo_outline (repo markdown files)")
+    outline = fetch_repo_outline(TEST_REPO)
+    assert outline and any(p["slug"].lower().startswith("readme") for p in outline)
+    print(f"  ok ({len(outline)} docs)")
 
-    # 3. 测试获取 Markdown
-    print("\n[测试 3/13] 获取 Markdown (fetch_markdown)")
-    try:
-        md = fetch_markdown(TEST_REPO, "1-overview")
-        if md and len(md) > 100:
-            print(f"  ✓ 通过 - 获取到 {len(md)} 字符")
-            print(f"    预览: {md[:50].replace(chr(10), ' ')}...")
-        else:
-            print("  ✗ 失败 - 未获取到内容")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
+    print("\n[3/6] fetch_markdown (README)")
+    md = fetch_markdown(TEST_REPO, "1-overview")
+    assert md and len(md) > 0
+    print(f"  ok ({len(md)} chars)")
 
-    # 4. 测试搜索 Wiki
-    print("\n[测试 4/13] 搜索 Wiki (search_wiki)")
-    try:
-        result = search_wiki(TEST_REPO, "gateway")
-        if result and result != "no result":
-            print(f"  ✓ 通过 - 搜索到结果")
-            print(f"    预览: {result[:100].replace(chr(10), ' ')}...")
-        else:
-            print("  ! 警告 - 未搜索到结果（可能是网络或索引问题）")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
+    print("\n[4/6] read_source_file")
+    content = read_source_file(TEST_REPO, "README.md", 1, 3)
+    assert content
+    print("  ok")
 
-    # 5. 测试推荐仓库
-    print("\n[测试 5/13] 推荐仓库 (recommend_repos)")
-    try:
-        result = recommend_repos()
-        if result and result.get("repos"):
-            print(f"  ✓ 通过 - 获取到 {len(result.get('repos', []))} 个推荐仓库")
-            print(f"    Topics: {', '.join(result.get('topics', [])[:5])}...")
-        else:
-            print("  ! 警告 - 未获取到推荐")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
+    print("\n[5/6] get_repo_info")
+    info = get_repo_info(TEST_REPO)
+    assert "error" not in info and info.get("url")
+    print("  ok")
 
-    # 6. 测试搜索仓库
-    print("\n[测试 6/13] 搜索仓库 (search_repos)")
-    try:
-        result = _search_repos_api("openclaw")
-        if result and len(result) > 0:
-            print(f"  ✓ 通过 - 搜索到 {len(result)} 个仓库")
-            print(
-                f"    第一个: {result[0].get('owner', 'N/A')}/{result[0].get('name', 'N/A')}"
-            )
-        else:
-            print("  ! 警告 - 未搜索到结果")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
-
-    # 7. 测试热榜
-    print("\n[测试 7/13] 每周热榜 (get_trending_repos)")
-    try:
-        result = get_trending_repos()
-        if result and len(result) > 0:
-            print(f"  ✓ 通过 - 获取到 {len(result)} 个热门仓库")
-            print(
-                f"    第一个: {result[0].get('owner', 'N/A')}/{result[0].get('name', 'N/A')}"
-            )
-        else:
-            print("  ! 警告 - 未获取到热榜")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
-
-    # 8. 测试获取仓库信息
-    print("\n[测试 8/13] 获取仓库信息 (get_repo_info)")
-    try:
-        result = _get_repo_info("openclaw/openclaw")
-        if result:
-            print(f"  ✓ 通过 - 获取到仓库信息")
-            print(f"    Status: {result.get('status', 'N/A')}")
-            print(f"    Stars: {result.get('star_count', 'N/A')}")
-        else:
-            print("  ! 警告 - 未获取到信息")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
-
-    # 9. 测试提交索引
-    print("\n[测试 9/13] 提交索引 (submit_repo)")
-    try:
-        # 测试已存在的仓库
-        result = submit_repo("https://github.com/openclaw/openclaw")
-        if result:
-            print(f"  ✓ 通过 - 提交成功")
-            print(f"    Status: {result.get('status', 'N/A')}")
-        else:
-            print("  ! 警告 - 提交返回空结果")
-    except Exception as e:
-        print(f"  ✗ 失败 - {e}")
-
-    # 10. 检查 Token 相关功能
-    print("\n[测试 10/13] Token 状态检查")
-    if _DEFAULT_TOKEN:
-        print(f"  ✓ Token 已设置 ({_DEFAULT_TOKEN[:20]}...)")
-
-        # 11. 测试创建对话
-        print("\n[测试 11/13] 创建对话 (create_talk)")
-        try:
-            # 先获取 repo_id
-            repo_info = _get_repo_info("openclaw/openclaw")
-            if repo_info and repo_info.get("repo_id"):
-                talk_id = create_talk()
-                if talk_id:
-                    print(f"  ✓ 通过 - 创建对话成功")
-                    print(f"    talk_id: {talk_id[:30]}...")
-
-                    # 12. 测试删除对话
-                    print("\n[测试 12/13] 删除对话 (delete_talk)")
-                    success = delete_talk(talk_id)
-                    if success:
-                        print("  ✓ 通过 - 删除对话成功")
-                    else:
-                        print("  ! 警告 - 删除对话可能失败")
-                else:
-                    print("  ! 警告 - 创建对话返回空")
-            else:
-                print("  ! 跳过 - 无法获取 repo_id")
-        except Exception as e:
-            print(f"  ✗ 失败 - {e}")
-
-        # 13. 测试完整 AI 对话流程
-        print("\n[测试 13/13] 完整 AI 对话 (chat_with_ai)")
-        try:
-            answer = chat_with_ai(
-                TEST_REPO, "你好，简要介绍一下这个项目", model="glm-5.1"
-            )
-            if answer and len(answer) > 10:
-                print(f"  ✓ 通过 - 获取到 AI 回复")
-                print(f"    回复: {answer[:80].replace(chr(10), ' ')}...")
-            else:
-                print("  ! 警告 - AI 回复为空或太短")
-        except Exception as e:
-            print(f"  ✗ 失败 - {e}")
-    else:
-        print("  ! 跳过 - Token 未设置，跳过 AI 相关测试")
-        print(
-            "  设置方式: export ZREAD_TOKEN='your-token' 或 set_default_token('token')"
-        )
+    print("\n[6/6] search_repos")
+    res = search_repos("openclaw")
+    assert "repos" in res
+    print(f"  ok ({len(res['repos'])} repos)")
 
     print("\n" + "=" * 70)
-    print("测试完成")
+    print("all smoke tests passed")
     print("=" * 70)
 
 
@@ -3211,84 +1961,16 @@ def run_tests():
 # ==========================================
 
 
-def _chat_with_repo_ai(
-    repo_path: str, question: str, model: Optional[str] = None, lang: str = "zh"
-) -> str:
-    """
-    与仓库 AI 助手对话（内部完整流程）
-    流程: 获取仓库元数据 → 创建会话 → 提问 → 删除会话
-    """
-    model = _get_model(model)
-    wiki_id, page_id, repo_id, error_message = _get_repo_ai_context(repo_path, lang)
-    if error_message:
-        return (
-            f"❌ {error_message.replace(tr('errors.error_prefix', lang) + ' ', '', 1)}"
-        )
-
-    # 获取 token
-    try:
-        token = _get_token()
-    except ValueError:
-        return tr("messages.set_token_for_ai", lang)
-
-    # 创建会话
-    talk_id = create_talk(token=token, lang=lang)
-    if not talk_id:
-        return tr("errors.ai_session_create_failed", lang)
-
-    try:
-        # 发送消息
-        answer = send_message(
-            talk_id=talk_id,
-            query=question,
-            wiki_id=wiki_id,
-            page_id=page_id,
-            repo_id=repo_id,
-            token=token,
-            model=model,
-            lang=lang,
-        )
-        return answer if answer else tr("messages.ai_no_valid_reply", lang)
-    finally:
-        # 清理会话
-        try:
-            delete_talk(talk_id, token=token)
-        except:
-            pass
-
 
 def _fetch_repo_outline(repo_path: str, lang: str = "zh") -> str:
-    """
-    获取仓库文档目录结构（内部完整流程）
-    流程: 获取仓库元数据 → 获取目录
-    返回文本格式: wiki_id, repo_id 和目录结构列表（纯文本，用于 MCP）
-    """
-    # 获取仓库元数据（内部会处理索引提交和刷新）
-    data = fetch_repo_metadata(repo_path)
-    if not data:
-        return tr("errors.fetch_repo_info_retry", lang)
-    unavailable_message = _get_ai_unavailable_message(repo_path, data)
-    if unavailable_message:
-        return f"❌ {unavailable_message.replace(tr('errors.error_prefix', lang) + ' ', '', 1)}"
-
-    repo_id = data.get("repo_id")
-    wiki_id = data.get("wiki_id")
-
-    # 获取目录
+    """获取仓库文档目录结构（仓库自带的 Markdown 文件，纯文本，用于 MCP）"""
     outline = fetch_repo_outline(repo_path, lang=lang)
     if not outline:
         return tr("errors.fetch_repo_outline_failed", lang)
 
-    # 解析仓库路径
     parsed = parse_repo_url(repo_path)
     owner, repo = parsed["owner"], parsed["repo"]
-
-    # 使用纯文本格式化（MCP 用纯文本）
-    outline_text = _format_outline_plain({"pages": outline}, owner, repo)
-
-    # 添加 wiki_id 和 repo_id 信息
-    header = f"wiki_id: {wiki_id or 'N/A'}\nrepo_id: {repo_id or 'N/A'}\n\n"
-    return header + outline_text
+    return _format_outline_plain({"pages": outline}, owner, repo)
 
 
 # ==========================================
@@ -3349,93 +2031,27 @@ def search_wiki(repo: str, query: str) -> _SearchWikiResult:
 def get_doc_outline(repo: str) -> _DocOutline:
     """读取仓库文档目录结构
 
-    获取仓库的完整文档大纲，包含所有页面的标题、slug 和层级关系。
-    首次调用会自动提交索引请求。
-    其中 https://zread.ai/owner/repo/{slug} 路径里的 slug 可直接用于 read_doc(repo, slug)。
+    列出仓库自带的 Markdown 文档文件（README、docs/ 等）。
+    每个页面的 slug 即仓库内文件路径，可直接用于 read_doc(repo, slug)。
 
     Args:
         repo: 仓库路径，格式: owner/repo
 
     Returns:
-        目录结构字典，包含 wiki_id, repo_id 和 pages 页面列表
+        目录结构字典，包含 pages 页面列表
 
     Examples:
         get_doc_outline("golang/go")
         get_doc_outline("microsoft/vscode")
     """
-    data = fetch_repo_metadata(repo)
-    if not data:
-        return {"error": tr("errors.fetch_repo_info_retry")}
-    unavailable_message = _get_ai_unavailable_message(repo, data)
-    if unavailable_message:
-        return {"error": unavailable_message.replace(tr("errors.error_prefix") + " ", "", 1)}
-
-    repo_id = data.get("repo_id")
-    wiki_id = data.get("wiki_id")
-
     outline = fetch_repo_outline(repo, lang=_DEFAULT_LANG)
     if not outline:
         return {"error": tr("errors.fetch_repo_outline_failed")}
 
-    pages = []
-    for p in outline:
-        page = {"slug": p.get("slug", ""), "title": p.get("title", "")}
-        pages.append(page)
-
-    return {"wiki_id": wiki_id, "repo_id": repo_id, "pages": pages}
-
-
-# ==========================================
-# MCP Tools: AI 智能问答
-# ==========================================
-
-
-def ask_ai(repo: str, question: str, model: Optional[str] = None) -> str:
-    """
-    向仓库 AI 助手提问（AI 调用 AI）
-
-    此工具让当前的 AI 通过 MCP 协议调用另一个专门的仓库 AI 助手来回答问题。
-    被调用的 AI 助手基于仓库文档内容进行分析，并回答你的问题。
-
-    被调用的 AI 助手拥有的工具：
-    - search_docs: 文档搜索，查找指南教程文档中的相关页面
-    - read_page: 获取指定页面的完整文档内容
-    - read_outline: 获取仓库文档的大纲结构
-    - read_file: 读取仓库文件的具体内容
-    - web_search: 网络搜索，使用简洁的关键词检索相关信息
-    - get_repo_structure: 分析并展示代码仓库的目录结构
-
-    如果需要分析特定文件或目录结构，可以在问题中显式要求 AI 使用上述工具进行回复。
-
-    对于仓库代码的复杂需求，应该优先使用此工具，如果有多个问题可并行调用。
-    适用于理解项目架构、使用方法、代码示例等复杂问题。
-    支持的 AI 模型: glm-5.1 (默认), claude-sonnet-4.6
-
-    返回的 Markdown 回答内容中可能包含两种链接格式：
-
-        1. **仓库文件链接** - 格式: `[文件名](文件路径#L开始行号-L结束行号)`
-        例如: `[index.ts](index.ts#L1-L28)` `[package.json](package.json#L1-L77)`
-        这类链接指向仓库内的源代码文件，可提取文件路径和行号范围，
-        使用 `read_source_file(repo, file_path, start_line, end_line)` 获取具体内容。
-
-        2. **文档导航链接** - 格式: `[标题](页面slug)`
-        例如: `[概述](1-overview)` `[快速开始](2-quick-start)`
-        这类链接指向文档的其他页面，使用 `read_doc(repo, slug)` 获取该页文档内容。
-
-    Args:
-        repo: 仓库路径，格式: owner/repo 或完整 URL
-        question: 要向 AI 提问的问题，如 "这个项目是做什么的？"
-        model: AI 模型选择，默认 "glm-5.1"，可选 "claude-sonnet-4.6"
-
-    Returns:
-        AI 助手的回答内容
-
-    Example:
-        ask_ai("openclaw/openclaw", "如何安装这个项目？")
-        ask_ai("openclaw/openclaw", "这个项目的登录鉴权逻辑是怎么处理的？")
-        ask_ai("openclaw/openclaw", "请使用 get_repo_structure 工具分析项目目录结构")
-    """
-    return _chat_with_repo_ai(repo, question, model=model, lang=_DEFAULT_LANG)
+    pages = [
+        {"slug": p.get("slug", ""), "title": p.get("title", "")} for p in outline
+    ]
+    return {"pages": pages}
 
 
 # ==========================================
@@ -3708,17 +2324,8 @@ def learn_project(repo_path: str) -> str:
 # ==========================================
 
 
-def _register_tools(mcp: Any, has_token: bool) -> None:
-    """
-    动态注册 MCP 工具
-
-    Args:
-        has_token: 是否有 token，决定注册哪些工具
-    """
-    # ==========================================
-    # 基础工具（不需要 token）
-    # ==========================================
-
+def _register_tools(mcp: Any) -> None:
+    """注册 MCP 工具（全部基于 GitHub，无需任何账号 / token）"""
     # 文档查询工具
     mcp.tool()(read_doc)
     mcp.tool()(search_wiki)
@@ -3733,16 +2340,9 @@ def _register_tools(mcp: Any, has_token: bool) -> None:
     # 文件获取工具
     mcp.tool()(read_source_file)
 
-    # ==========================================
-    # 高级工具（需要 token）
-    # ==========================================
-    # AI 对话工具 - 仅在 has_token 为 True 时注册
-    if has_token:
-        mcp.tool()(ask_ai)
-
 
 def _register_resources(mcp: Any) -> None:
-    """注册 MCP 资源（都不需要 token）"""
+    """注册 MCP 资源"""
     mcp.resource("docs://{owner}/{repo}/{page_slug}")(documentation_page_resource)
     mcp.resource("catalog://{owner}/{repo}")(documentation_catalog_resource)
     mcp.resource("trending://weekly")(weekly_trending_resource)
@@ -3755,14 +2355,14 @@ def _register_prompts(mcp: Any) -> None:
     mcp.prompt()(learn_project)
 
 
-def _get_mcp(has_token: bool) -> Any:
+def _get_mcp() -> Any:
     """按需创建并缓存 MCP 实例，避免普通 CLI 启动时导入 fastmcp。"""
     global _MCP_INSTANCE
     if _MCP_INSTANCE is None:
         from fastmcp import FastMCP
 
-        mcp = FastMCP("zread-ai")
-        _register_tools(mcp, has_token)
+        mcp = FastMCP("zread")
+        _register_tools(mcp)
         _register_resources(mcp)
         _register_prompts(mcp)
         _MCP_INSTANCE = mcp
@@ -3778,13 +2378,6 @@ cli_app = typer.Typer(
 )
 
 
-def _set_token(token: Optional[str]) -> None:
-    """设置全局 token"""
-    global _DEFAULT_TOKEN
-    if token:
-        _DEFAULT_TOKEN = token
-
-
 def _print_help_with_env(ctx: typer.Context) -> None:
     """打印帮助信息并附加环境变量面板"""
     # 先打印标准帮助
@@ -3793,10 +2386,7 @@ def _print_help_with_env(ctx: typer.Context) -> None:
     # 添加环境变量面板
     console = Console()
     env_table = Table(show_header=False, box=None, padding=(0, 2))
-    env_table.add_row("[green]ZREAD_TOKEN[/green]", tr("cli.env_var_token_desc"))
     env_table.add_row("[green]ZREAD_LANG[/green]", tr("cli.env_var_lang_desc"))
-    env_table.add_row("[green]ZREAD_MODEL[/green]", tr("cli.env_var_model_desc"))
-    env_table.add_row("[green]ZREAD_DIRECT[/green]", tr("cli.env_var_direct_desc"))
     env_table.add_row("[green]GITHUB_TOKEN[/green]", tr("cli.env_var_github_token_desc"))
 
     env_panel = Panel(
@@ -3856,46 +2446,6 @@ def cli_callback(
         raise typer.Exit(0)
 
 
-def _cli_http_get(
-    url: str,
-    lang: str = "zh",
-    error_msg: str = "请求失败",
-    params: Optional[dict] = None,
-    headers: Optional[dict] = None,
-    cookies: Optional[dict] = None,
-    timeout: int = 30,
-) -> dict:
-    """CLI 命令中执行 HTTP GET 请求（基于 _http_get，失败时退出）
-
-    Args:
-        url: 请求 URL
-        lang: 语言，自动添加 x-locale header 和 cookie
-        error_msg: 错误提示信息
-        params: URL 查询参数
-        headers: 额外的请求头
-        cookies: 额外的 cookies
-        timeout: 超时时间（秒）
-
-    Returns:
-        API 响应的 data 字段
-
-    Raises:
-        typer.Exit: 请求失败时退出
-    """
-    result = _http_get(
-        url=url,
-        lang=lang,
-        error_msg=error_msg,
-        params=params,
-        headers=headers,
-        cookies=cookies,
-        timeout=timeout,
-    )
-    if result is None:
-        raise typer.Exit(1)
-    return result
-
-
 def _run_with_cli_status(
     enabled: bool, message: str, fn: Callable[..., Any], *args, **kwargs
 ) -> Any:
@@ -3921,15 +2471,9 @@ def cmd_mcp(
         Optional[str],
         typer.Argument(help=tr("cli.args.address")),
     ] = None,
-    token: Annotated[
-        Optional[str], typer.Option("--token", "-t", help=tr("cli.options.token"))
-    ] = None,
     lang: Annotated[
         Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
     ] = None,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """启动 MCP 服务器
 
@@ -3947,13 +2491,11 @@ def cmd_mcp(
     # MCP 进程级默认语言：显式参数优先，否则沿用环境变量推导结果
     if lang:
         set_default_lang(lang)
-    if direct:
-        set_direct_mode(True)
 
     # 解析地址参数
     host, port, path = _parse_address(transport, address)
 
-    _run_mcp_server(transport, host, port, path, token)
+    _run_mcp_server(transport, host, port, path)
 
 
 # ==========================================
@@ -3974,7 +2516,7 @@ _INSTALL_AGENT_ALIASES = {
 }
 
 
-def _mcp_server_spec(token: Optional[str], url: Optional[str] = None) -> Dict[str, Any]:
+def _mcp_server_spec(url: Optional[str] = None) -> Dict[str, Any]:
     """构造 zread MCP 服务的客户端配置
 
     url 为空：本地 stdio 模式（uvx zread mcp）
@@ -3982,81 +2524,61 @@ def _mcp_server_spec(token: Optional[str], url: Optional[str] = None) -> Dict[st
     """
     if url:
         return {"type": "http", "url": url}
-    spec: Dict[str, Any] = {"command": "uvx", "args": ["zread", "mcp"]}
-    if token:
-        spec["env"] = {"ZREAD_TOKEN": token}
-    return spec
+    return {"command": "uvx", "args": ["zread", "mcp"]}
 
 
-def _claude_code_snippet(token: Optional[str], url: Optional[str] = None) -> str:
+def _claude_code_snippet(url: Optional[str] = None) -> str:
     """Claude Code 的 JSON 配置片段（.mcp.json / ~/.claude.json）"""
     return json.dumps(
-        {"mcpServers": {"zread": _mcp_server_spec(token, url)}},
+        {"mcpServers": {"zread": _mcp_server_spec(url)}},
         ensure_ascii=False,
         indent=2,
     )
 
 
-def _claude_code_add_command(
-    token: Optional[str], url: Optional[str] = None
-) -> List[str]:
+def _claude_code_add_command(url: Optional[str] = None) -> List[str]:
     """Claude Code CLI 的注册命令"""
     cmd = ["claude", "mcp", "add", "--scope", "user"]
     if url:
         return cmd + ["--transport", "http", "zread", url]
-    if token:
-        cmd += ["--env", f"ZREAD_TOKEN={token}"]
     return cmd + ["zread", "--", "uvx", "zread", "mcp"]
 
 
-def _codex_snippet(token: Optional[str], url: Optional[str] = None) -> str:
+def _codex_snippet(url: Optional[str] = None) -> str:
     """Codex 的 TOML 配置片段（~/.codex/config.toml）"""
     if url:
         return "\n".join(["[mcp_servers.zread]", f'url = "{url}"'])
-    lines = [
-        "[mcp_servers.zread]",
-        'command = "uvx"',
-        'args = ["zread", "mcp"]',
-    ]
-    if token:
-        lines += ["", "[mcp_servers.zread.env]", f'ZREAD_TOKEN = "{token}"']
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            "[mcp_servers.zread]",
+            'command = "uvx"',
+            'args = ["zread", "mcp"]',
+        ]
+    )
 
 
-def _codex_add_command(token: Optional[str]) -> List[str]:
+def _codex_add_command() -> List[str]:
     """Codex CLI 的注册命令（stdio 模式）"""
-    cmd = ["codex", "mcp", "add"]
-    if token:
-        cmd += ["--env", f"ZREAD_TOKEN={token}"]
-    return cmd + ["zread", "--", "uvx", "zread", "mcp"]
+    return ["codex", "mcp", "add", "zread", "--", "uvx", "zread", "mcp"]
 
 
-def _hermes_snippet(token: Optional[str], url: Optional[str] = None) -> str:
+def _hermes_snippet(url: Optional[str] = None) -> str:
     """Hermes Agent 的 YAML 配置片段（~/.hermes/config.yaml）"""
     if url:
         return "\n".join(["mcp_servers:", "  zread:", f'    url: "{url}"'])
-    lines = [
-        "mcp_servers:",
-        "  zread:",
-        '    command: "uvx"',
-        '    args: ["zread", "mcp"]',
-    ]
-    if token:
-        lines += ["    env:", f'      ZREAD_TOKEN: "{token}"']
-    return "\n".join(lines)
+    return "\n".join(
+        [
+            "mcp_servers:",
+            "  zread:",
+            '    command: "uvx"',
+            '    args: ["zread", "mcp"]',
+        ]
+    )
 
 
-def _mask_token(text: str, token: Optional[str]) -> str:
-    """在展示命令行时隐去 token"""
-    if token:
-        return text.replace(token, "***")
-    return text
-
-
-def _run_install_command(cmd: List[str], token: Optional[str], lang: str) -> None:
+def _run_install_command(cmd: List[str], lang: str) -> None:
     """执行智能体自带的 mcp add 命令"""
-    display = _mask_token(" ".join(cmd), token)
-    typer.echo(tr("install.running", lang, command=display))
+    typer.echo(tr("install.running", lang, command=" ".join(cmd)))
     result = subprocess.run(cmd)
     if result.returncode != 0:
         typer.echo(
@@ -4078,16 +2600,14 @@ def _print_manual_config(
     typer.echo(f"\n{snippet}\n")
 
 
-def _install_hermes(
-    token: Optional[str], lang: str, url: Optional[str] = None
-) -> None:
+def _install_hermes(lang: str, url: Optional[str] = None) -> None:
     """将 zread 写入 Hermes Agent 的 ~/.hermes/config.yaml"""
     config_path = Path.home() / ".hermes" / "config.yaml"
     try:
         import yaml
     except ImportError:
         typer.echo(tr("install.yaml_missing", lang), err=True)
-        _print_manual_config(None, _hermes_snippet(token, url), str(config_path), lang)
+        _print_manual_config(None, _hermes_snippet(url), str(config_path), lang)
         raise typer.Exit(1)
 
     config: Dict[str, Any] = {}
@@ -4099,7 +2619,7 @@ def _install_hermes(
                 tr("install.config_parse_failed", lang, path=config_path, error=e),
                 err=True,
             )
-            _print_manual_config(None, _hermes_snippet(token, url), str(config_path), lang)
+            _print_manual_config(None, _hermes_snippet(url), str(config_path), lang)
             raise typer.Exit(1)
         if isinstance(loaded, dict):
             config = loaded
@@ -4113,7 +2633,7 @@ def _install_hermes(
         servers = {}
         config["mcp_servers"] = servers
     # Hermes 的远程服务配置只需要 url 字段（无 type）
-    servers["zread"] = {"url": url} if url else _mcp_server_spec(token)
+    servers["zread"] = {"url": url} if url else _mcp_server_spec()
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(
@@ -4128,9 +2648,6 @@ def cmd_install(
     ctx: typer.Context,
     agent: Annotated[
         Optional[str], typer.Argument(help=tr("cli.args.agent"))
-    ] = None,
-    token: Annotated[
-        Optional[str], typer.Option("--token", "-t", help=tr("cli.options.token"))
     ] = None,
     print_only: Annotated[
         bool, typer.Option("--print", "-p", help=tr("cli.options.print_only"))
@@ -4154,7 +2671,7 @@ def cmd_install(
 
     示例:
         install claude-code
-        install codex -t your-token
+        install codex
         install hermes --print
         install claude-code --url http://zread.internal:8708/mcp
     """
@@ -4172,21 +2689,19 @@ def cmd_install(
         )
         raise typer.Exit(1)
 
-    token = _get_token(token, required=False)
-
     if target == "claude-code":
-        run_cmd = _claude_code_add_command(token, url)
-        snippet = _claude_code_snippet(token, url)
+        run_cmd = _claude_code_add_command(url)
+        snippet = _claude_code_snippet(url)
         snippet_path = "~/.claude.json (user) / .mcp.json (project)"
         if print_only or shutil.which("claude") is None:
             if not print_only:
                 typer.echo(tr("install.cli_not_found", lang, cli="claude"), err=True)
             _print_manual_config(run_cmd, snippet, snippet_path, lang)
         else:
-            _run_install_command(run_cmd, token, lang)
+            _run_install_command(run_cmd, lang)
             typer.echo(f"✅ {tr('install.success', lang, agent='Claude Code')}")
     elif target == "codex":
-        snippet = _codex_snippet(token, url)
+        snippet = _codex_snippet(url)
         snippet_path = "~/.codex/config.toml"
         if url:
             # codex mcp add 不支持 URL 服务，输出手动配置
@@ -4194,21 +2709,18 @@ def cmd_install(
         elif print_only or shutil.which("codex") is None:
             if not print_only:
                 typer.echo(tr("install.cli_not_found", lang, cli="codex"), err=True)
-            _print_manual_config(_codex_add_command(token), snippet, snippet_path, lang)
+            _print_manual_config(_codex_add_command(), snippet, snippet_path, lang)
         else:
-            _run_install_command(_codex_add_command(token), token, lang)
+            _run_install_command(_codex_add_command(), lang)
             typer.echo(f"✅ {tr('install.success', lang, agent='Codex')}")
     else:  # hermes
         if print_only:
             _print_manual_config(
-                None, _hermes_snippet(token, url), "~/.hermes/config.yaml", lang
+                None, _hermes_snippet(url), "~/.hermes/config.yaml", lang
             )
         else:
-            _install_hermes(token, lang, url)
+            _install_hermes(lang, url)
             typer.echo(f"✅ {tr('install.success', lang, agent='Hermes Agent')}")
-
-    if not token and not url:
-        typer.echo(tr("install.no_token_hint", lang))
 
 
 @cli_app.command(name="ls", help=tr("cli.commands.ls"))
@@ -4224,9 +2736,6 @@ def cmd_get_outline(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """获取文档目录结构
 
@@ -4239,8 +2748,6 @@ def cmd_get_outline(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
-    if direct:
-        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     outline = _run_with_cli_status(
@@ -4298,9 +2805,6 @@ def cmd_cat(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """查看仓库内容（支持 zread 文档或 GitHub 文件）
 
@@ -4320,8 +2824,6 @@ def cmd_cat(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo_or_url')}", err=True)
         raise typer.Exit(1)
-    if direct:
-        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     # 收集所有位置参数
@@ -4584,7 +3086,7 @@ def _cat_zread_page(
 def _process_markdown_links(content: str, repo: str) -> str:
     """处理 markdown 中的链接
 
-    - slug 格式链接: [xxx](slug) -> [🔗xxx](https://zread.ai/owner/repo/slug)
+    - slug 格式链接: [xxx](slug) -> [🔗xxx](https://github.com/owner/repo/blob/HEAD/slug)
     - 代码文件链接: [xxx](path/file.py) -> [🐙xxx](path/file.py)
     """
     import re
@@ -4617,10 +3119,9 @@ def _process_markdown_links(content: str, repo: str) -> str:
             link_text = _prefix_slug_text(text, last_segment)
             if url.startswith(("http://", "https://")):
                 full_url = url
-            elif url.startswith("/"):
-                full_url = f"{BASE_URL}{url}"
             else:
-                full_url = f"{BASE_URL}/{repo_path}/{url}"
+                file_path = url.lstrip("/")
+                full_url = f"https://github.com/{repo_path}/blob/HEAD/{file_path}"
             return f"[🔗{link_text}]({full_url})"
 
         if "." in last_segment:
@@ -4888,9 +3389,6 @@ def cmd_find(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """搜索仓库或文档关键词
 
@@ -4909,8 +3407,6 @@ def cmd_find(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_query')}", err=True)
         raise typer.Exit(1)
-    if direct:
-        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     # 检查 query 参数是否是有效的 owner/repo 格式
@@ -4942,64 +3438,25 @@ def cmd_find(
 def _search_in_repo(
     repo: str, keyword: str, lang: str, json_output: bool, plain: bool = False
 ) -> None:
-    """在仓库文档内搜索关键词"""
-    if _is_direct():
-        results = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.search_docs', lang)}[/dim]",
-            _direct_search_wiki,
-            repo,
-            keyword,
-            lang,
-        )
-        if results is None:
-            typer.echo(tr("errors.search_failed", lang), err=True)
-            raise typer.Exit(1)
-
-        if json_output:
-            typer.echo(json.dumps(results, ensure_ascii=False, indent=2))
-        elif not results:
-            typer.echo(tr("messages.no_results", lang))
-        elif plain:
-            typer.echo(_format_search_results_plain(results))
-        else:
-            _format_search_results_rich(results, repo)
-        return
-
-    status = _run_with_cli_status(
-        not (json_output or plain),
-        f"[dim]{tr('status.fetch_repo_info', lang)}[/dim]",
-        fetch_repo_metadata,
-        repo,
-    )
-    if not status or not status.get("wiki_id"):
-        typer.echo(tr("errors.fetch_repo_metadata", lang), err=True)
-        raise typer.Exit(1)
-
-    wiki_id = status["wiki_id"]
-    search_url = f"{BASE_URL}/api/v1/wiki/{wiki_id}/search"
-
+    """在仓库文档内搜索关键词（grep 仓库自带的 Markdown 文档）"""
     results = _run_with_cli_status(
         not (json_output or plain),
         f"[dim]{tr('status.search_docs', lang)}[/dim]",
-        _cli_http_get,
-        search_url,
-        lang=lang,
-        error_msg=tr("errors.search_failed", lang),
-        params={"q": keyword},
+        _github_search_docs,
+        repo,
+        keyword,
+        lang,
     )
+    if results is None:
+        typer.echo(tr("errors.search_failed", lang), err=True)
+        raise typer.Exit(1)
 
     if json_output:
         typer.echo(json.dumps(results, ensure_ascii=False, indent=2))
-        return
-
-    if not results:
+    elif not results:
         typer.echo(tr("messages.no_results", lang))
-        return
-
-    if plain:
-        output = _format_search_results_plain(results)
-        typer.echo(output)
+    elif plain:
+        typer.echo(_format_search_results_plain(results))
     else:
         _format_search_results_rich(results, repo)
 
@@ -5008,26 +3465,16 @@ def _search_repos(
     query: str, lang: str, json_output: bool, plain: bool = False
 ) -> None:
     """搜索 GitHub 仓库"""
-    if _is_direct():
-        data = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.search_repos', lang)}[/dim]",
-            _direct_search_repos,
-            query,
-            lang,
-        )
-        if data is None:
-            typer.echo(tr("errors.search_failed", lang), err=True)
-            raise typer.Exit(1)
-    else:
-        data = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.search_repos', lang)}[/dim]",
-            _cli_http_get,
-            f"{BASE_URL}/api/v1/repo?q={urllib.parse.quote(query)}",
-            lang=lang,
-            error_msg=tr("errors.search_failed", lang),
-        )
+    data = _run_with_cli_status(
+        not (json_output or plain),
+        f"[dim]{tr('status.search_repos', lang)}[/dim]",
+        _github_search_repos,
+        query,
+        lang,
+    )
+    if data is None:
+        typer.echo(tr("errors.search_failed", lang), err=True)
+        raise typer.Exit(1)
     if isinstance(data, dict):
         data = data.get("list", [])
 
@@ -5058,9 +3505,6 @@ def cmd_top(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """获取热门仓库榜单
 
@@ -5071,28 +3515,16 @@ def cmd_top(
         top --plain
     """
     lang = _resolve_lang(lang)
-    if direct:
-        set_direct_mode(True)
-    if _is_direct():
-        result = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
-            _direct_trending,
-            lang,
-            weeks,
-        )
-        if result is None:
-            typer.echo(tr("errors.fetch_trending", lang), err=True)
-            raise typer.Exit(1)
-    else:
-        result = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
-            _cli_http_get,
-            f"{BASE_URL}/api/v1/public/repo/trending",
-            lang=lang,
-            error_msg=tr("errors.fetch_trending", lang),
-        )
+    result = _run_with_cli_status(
+        not (json_output or plain),
+        f"[dim]{tr('status.fetch_trending', lang)}[/dim]",
+        _github_trending,
+        lang,
+        weeks,
+    )
+    if result is None:
+        typer.echo(tr("errors.fetch_trending", lang), err=True)
+        raise typer.Exit(1)
     # 限制显示最近 weeks 周的榜单
     limited_result = result[:weeks] if isinstance(result, list) else []
 
@@ -5122,9 +3554,6 @@ def cmd_rand(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """随机发现推荐仓库
 
@@ -5144,31 +3573,16 @@ def cmd_rand(
         rand rust --plain
     """
     lang = _resolve_lang(lang)
-    if direct:
-        set_direct_mode(True)
-    if _is_direct():
-        data = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
-            _direct_recommend,
-            topic,
-            lang,
-        )
-        if data is None:
-            typer.echo(tr("errors.fetch_recommend", lang), err=True)
-            raise typer.Exit(1)
-    else:
-        url = f"{BASE_URL}/api/v1/repo/recommend"
-        if topic:
-            url += f"?topic={urllib.parse.quote(topic)}"
-        data = _run_with_cli_status(
-            not (json_output or plain),
-            f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
-            _cli_http_get,
-            url,
-            lang=lang,
-            error_msg=tr("errors.fetch_recommend", lang),
-        )
+    data = _run_with_cli_status(
+        not (json_output or plain),
+        f"[dim]{tr('status.fetch_recommend', lang)}[/dim]",
+        _github_recommend,
+        topic,
+        lang,
+    )
+    if data is None:
+        typer.echo(tr("errors.fetch_recommend", lang), err=True)
+        raise typer.Exit(1)
 
     if json_output:
         typer.echo(json.dumps(data, ensure_ascii=False, indent=2))
@@ -5182,108 +3596,16 @@ def cmd_rand(
         _format_repo_list_rich(repos or [], lang)
 
 
-def _background_submit_repo(repo_path: str) -> None:
-    """后台异步提交仓库索引（不阻塞主流程，需要 token，静默失败）"""
-
-    def _submit():
-        try:
-            token = _get_token(required=False)
-            if not token:
-                return
-            submit_repo(repo_path, token=token)
-        except Exception:
-            pass
-
-    threading.Thread(target=_submit, daemon=True).start()
-
-
-def _background_refresh_repo(repo_id: str) -> None:
-    """后台异步刷新仓库索引（不阻塞主流程）"""
-
-    def _refresh():
-        try:
-            refresh_repo(repo_id)
-        except Exception:
-            pass  # 后台任务不抛出错误
-
-    threading.Thread(target=_refresh, daemon=True).start()
-
-
 def fetch_repo_metadata(repo_url_or_path: str) -> Optional[Dict[str, Any]]:
     """
-    获取仓库元数据
-
-    如果仓库状态为 inactive（未收录）或超过5天未更新，会触发后台异步任务。
+    获取仓库元数据（直接来自 GitHub 仓库 API）
 
     :param repo_url_or_path: 支持多种格式:
-        - https://zread.ai/owner/repo
         - https://github.com/owner/repo
         - owner/repo
-    :return: API 返回的完整 data 字段，失败返回 None
+    :return: 仓库信息字典（未找到时为 {"_error": "not_found"}），失败返回 None
     """
-    if _DIRECT_MODE:
-        return _direct_repo_metadata(repo_url_or_path)
-
-    parsed = parse_repo_url(repo_url_or_path)
-    repo_path = parsed["repo_path"]
-    owner, name = parsed["owner"], parsed["repo"]
-    try:
-        response = httpx.get(
-            f"{BASE_URL}/api/v1/repo/github/{owner}/{name}",
-            headers=DEFAULT_HEADERS,
-            timeout=30,
-        )
-        response.raise_for_status()
-        result = response.json()
-        if result.get("code") != 0:
-            msg = result.get("msg", "")
-            if "not found" in msg.lower():
-                return {"_error": "not_found"}
-            return None
-        data = result.get("data", {})
-
-        # 检查状态，触发后台异步任务
-        status = data.get("status", "")
-        repo_id = data.get("repo_id", "")
-        updated_at = data.get("updated_at", 0)
-
-        if status == "inactive":
-            # 仓库未收录，后台提交索引
-            _background_submit_repo(repo_path)
-            data["_submitted"] = True
-        elif status == "success" and repo_id and updated_at:
-            # 已收录，检查是否超过5天未更新
-            days_since_update = (time.time() - updated_at) / (24 * 3600)
-            if days_since_update > 5:
-                _background_refresh_repo(repo_id)
-                data["_refreshed"] = True
-
-        return data
-    except httpx.RequestError:
-        return None
-
-
-def _get_ai_unavailable_message(
-    repo_path: str, metadata: Optional[Dict[str, Any]]
-) -> str:
-    """根据仓库状态生成 AI 不可用提示。"""
-    if _DIRECT_MODE:
-        # 直连模式没有收录状态，文档直接来自 GitHub，无需提示
-        return ""
-    if not metadata:
-        return tr("errors.fetch_repo_status")
-
-    if metadata.get("wiki_id"):
-        return ""
-
-    status = metadata.get("status", "")
-    if status == "inactive":
-        return tr("errors.repo_not_indexed", repo=repo_path)
-    if status == "progress":
-        return tr("errors.repo_indexing", repo=repo_path)
-    if not metadata.get("wiki_id"):
-        return tr("errors.repo_missing_docs")
-    return tr("errors.repo_ai_unavailable")
+    return _github_repo_metadata(repo_url_or_path)
 
 
 @cli_app.command(name="stat", help=tr("cli.commands.stat"))
@@ -5299,9 +3621,6 @@ def cmd_stat(
     plain: Annotated[
         bool, typer.Option("--plain", "-p", help=tr("cli.options.plain"))
     ] = not _IS_INTERACTIVE,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """显示仓库信息
 
@@ -5314,8 +3633,6 @@ def cmd_stat(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
-    if direct:
-        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     data = _run_with_cli_status(
@@ -5350,396 +3667,6 @@ def cmd_stat(
         )
 
 
-def _ai_help() -> str:
-    """Get AI command help with dynamic token status."""
-    help_text = tr("cli.commands.ai")
-    if os.environ.get("ZREAD_TOKEN") or _CONFIG_FROM_FILE.get("token"):
-        return help_text.replace(" (token required)", " (token ready)")
-    return help_text
-
-
-@cli_app.command(
-    name="ai",
-    help=_ai_help(),
-    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
-)
-def cmd_ai(
-    ctx: typer.Context,
-    repo: Annotated[Optional[str], typer.Argument(help=tr("cli.args.repo"))] = None,
-    question: Annotated[
-        Optional[str], typer.Argument(help=tr("cli.args.question_optional"))
-    ] = None,
-    lang: Annotated[
-        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
-    ] = None,
-    token: Annotated[
-        Optional[str], typer.Option("--token", "-t", help=tr("cli.options.token"))
-    ] = None,
-    plain: Annotated[
-        bool, typer.Option("--plain", "-p", help=tr("cli.options.ai_plain"))
-    ] = not _IS_INTERACTIVE,
-    json_output: Annotated[
-        bool, typer.Option("--json", "-j", help=tr("cli.options.ai_json"))
-    ] = False,
-    model: Annotated[
-        Optional[str],
-        typer.Option(
-            "--model",
-            "-m",
-            help=tr("cli.options.model"),
-            show_default=False,
-        ),
-    ] = None,
-) -> None:
-    """向仓库 AI 提问 (需要 token)
-
-    示例:
-        ai golang/go                           # 进入交互对话模式
-        ai golang/go "channel 和 mutex 怎么选择"
-        ai python/cpython "GIL 机制和并发优化" --plain
-        ai rust-lang/rust "所有权规则" -t your_token
-        ai facebook/react "hooks原理" --model claude-sonnet-4.6
-    """
-    if not repo:
-        typer.echo(ctx.get_help())
-        typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
-        raise typer.Exit(1)
-    if ctx.args:
-        question_parts = [question] if question else []
-        question_parts.extend(ctx.args)
-        question = " ".join(part for part in question_parts if part).strip() or None
-
-    import asyncio
-
-    lang = _resolve_lang(lang)
-    if _DIRECT_MODE:
-        typer.echo(f"❌ {tr('errors.ai_direct_mode', lang)}", err=True)
-        raise typer.Exit(1)
-
-    _set_token(token)
-    if not _DEFAULT_TOKEN:
-        typer.echo(tr("errors.ai_requires_token"), err=True)
-        raise typer.Exit(1)
-
-    try:
-        if question:
-            _, _, _, error_message = _get_repo_ai_context(repo, lang)
-            if error_message:
-                typer.echo(error_message, err=True)
-                raise typer.Exit(1)
-
-            talk_id = create_talk(_DEFAULT_TOKEN, lang)
-            if not talk_id:
-                typer.echo(tr("errors.create_talk", lang), err=True)
-                raise typer.Exit(1)
-
-            asyncio.run(
-                _ask_single_turn(
-                    talk_id, repo, question, lang, plain, json_output, model
-                )
-            )
-            delete_talk(talk_id, _DEFAULT_TOKEN)
-        else:
-            # 进入交互模式（所有初始化在内部异步进行，立即显示提示）
-            if not _IS_INTERACTIVE:
-                typer.echo(
-                    "Error: interactive mode requires a TTY. "
-                    "Please provide a question: zread ai <repo> <question>",
-                    err=True,
-                )
-                raise typer.Exit(1)
-            asyncio.run(_ask_interactive(repo, lang, plain, model, _DEFAULT_TOKEN))
-    except KeyboardInterrupt:
-        pass
-
-
-async def _ask_single_turn(
-    talk_id: str,
-    repo_path: str,
-    question: str,
-    lang: str,
-    plain: bool,
-    json_output: bool,
-    model: Optional[str] = None,
-) -> None:
-    """单轮对话"""
-    model = _get_model(model)
-    if json_output:
-        full_reasoning = []
-        full_text = []
-
-        async for chunk in send_repo_message_async(
-            talk_id, repo_path, question, None, model, lang
-        ):
-            error_message = _collect_ai_chunk(
-                chunk, full_reasoning, full_text, include_round_finish=False
-            )
-            if error_message:
-                typer.echo(
-                    json.dumps(
-                        {
-                            "reasoning_content": "".join(full_reasoning),
-                            "text": "".join(full_text),
-                            "error": error_message,
-                        },
-                        ensure_ascii=False,
-                        indent=2,
-                    )
-                )
-                return
-
-        result = {
-            "reasoning_content": "".join(full_reasoning),
-            "text": "".join(full_text),
-        }
-        typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
-    elif plain:
-        # 只流式打印正文（只处理 answer 事件，避免 round_finish 重复）
-        async for chunk in send_repo_message_async(
-            talk_id, repo_path, question, None, model, lang
-        ):
-            if chunk and isinstance(chunk, dict) and "event" in chunk:
-                # 只处理 answer 事件，跳过 round_finish 避免重复
-                if chunk.get("event") == "answer":
-                    text = chunk.get("text", "")
-                    if text:
-                        typer.echo(text, nl=False)
-                elif chunk.get("event") == "error":
-                    typer.echo(
-                        f"\n{tr('errors.error_prefix', lang)} {chunk.get('text', tr('messages.unknown_error', lang))}",
-                        err=True,
-                    )
-                    return
-        typer.echo("")
-    else:
-        from rich.console import Console
-
-        console = Console()
-        wiki_id, page_id, repo_id, error_message = await _await_with_status(
-            console,
-            f"[dim]{tr('status.preparing', lang)}[/dim]",
-            asyncio.to_thread(_get_repo_ai_context, repo_path, lang),
-        )
-        if error_message:
-            console.print(
-                f"[red]❌ {error_message.replace(tr('errors.error_prefix', lang) + ' ', '', 1)}[/]"
-            )
-            return
-
-        await _ask_with_live(
-            talk_id,
-            repo_path,
-            question,
-            lang,
-            model,
-            wiki_id,
-            page_id,
-            repo_id,
-            console,
-        )
-
-
-async def _init_chat_session(
-    repo_path: str, lang: str, token: str
-) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
-    """后台初始化：创建对话并获取仓库信息
-    返回: (talk_id, wiki_id, page_id, repo_id)
-    """
-    talk_id = create_talk(token, lang)
-    wiki_id, page_id, repo_id, error_message = _get_repo_ai_context(repo_path, lang)
-    if error_message:
-        return talk_id, None, None, None
-    return talk_id, wiki_id, page_id, repo_id
-
-
-async def _async_input(prompt: str = "") -> str:
-    """异步获取用户输入，避免 input() 在复杂终端渲染下触发解码异常。"""
-
-    def _read_line() -> str:
-        sys.stdout.write(prompt)
-        sys.stdout.flush()
-
-        raw = sys.stdin.buffer.readline()
-        if not raw:
-            return "exit"
-
-        raw = raw.rstrip(b"\r\n")
-        try:
-            return raw.decode("utf-8")
-        except UnicodeDecodeError:
-            return raw.decode("utf-8", errors="ignore")
-
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _read_line)
-
-
-async def _ask_interactive(
-    repo_path: str, lang: str, plain: bool, model: str, token: str
-) -> None:
-    """交互式多轮对话 - 启动即刻输入，支持双重加载动画"""
-    model = _get_model(model)
-    from rich.console import Console
-
-    console = Console()
-    console.print(
-        f"\n[bold green]🤖 {tr('messages.ai_mode_title', lang)}[/] ([cyan]{tr('messages.repo_label', lang)}: {repo_path}[/])"
-    )
-    console.print(f"[dim]{tr('messages.ai_mode_hint', lang)}[/]\n")
-
-    # 立即后台异步初始化（创建对话 + 获取仓库信息）
-    init_task = asyncio.create_task(_init_chat_session(repo_path, lang, token))
-
-    talk_id: Optional[str] = None
-    wiki_id: Optional[str] = None
-    page_id: Optional[str] = None
-    repo_id: Optional[str] = None
-
-    try:
-        while True:
-            try:
-                # 异步获取用户输入（不会阻塞事件循环，后台任务可以继续执行）
-                print()
-                user_input = await _async_input("✨ ")
-
-                if user_input.strip().lower() in ("/exit", "exit", "quit"):
-                    break
-                if not user_input.strip():
-                    continue
-
-                if not init_task.done():
-                    talk_id, wiki_id, page_id, repo_id = await _await_with_status(
-                        console,
-                        f"[dim]{tr('status.preparing', lang)}[/dim]",
-                        init_task,
-                    )
-                elif talk_id is None:
-                    talk_id, wiki_id, page_id, repo_id = await init_task
-
-                if talk_id is None:
-                    typer.echo(f"❌ {tr('errors.create_talk', lang)}", err=True)
-                    continue
-                if wiki_id is None:
-                    typer.echo(f"❌ {tr('errors.fetch_repo_metadata', lang)}", err=True)
-                    continue
-
-                # 准备生成器
-                gen = send_repo_message_async(
-                    talk_id,
-                    repo_path,
-                    user_input,
-                    None,
-                    model,
-                    lang,
-                    wiki_id,
-                    page_id,
-                    repo_id,
-                )
-
-                if plain:
-                    it, first_chunk = await _get_first_async_chunk_with_status(
-                        console, f"[dim]{tr('status.thinking', lang)}[/dim]", gen
-                    )
-
-                    # 渲染首包及后续包
-                    if first_chunk:
-                        if first_chunk.get("event") == "answer":
-                            print(first_chunk.get("text", ""), end="", flush=True)
-                        async for chunk in it:  # 继续迭代
-                            if chunk.get("event") == "answer":
-                                print(chunk.get("text", ""), end="", flush=True)
-                    print()  # 确保最后有换行
-                else:
-                    # --- 动画 2: 等待 AI 首包响应 (Rich Live 模式) ---
-                    await _ask_with_live(
-                        talk_id,
-                        repo_path,
-                        user_input,
-                        lang,
-                        model,
-                        wiki_id,
-                        page_id,
-                        repo_id,
-                        console,
-                    )
-                    print()  # 确保最后有换行
-
-            except EOFError:
-                break
-    finally:
-        if talk_id:
-            delete_talk(talk_id, token)
-
-
-async def _ask_with_live(
-    talk_id: str,
-    repo_path: str,
-    question: str,
-    lang: str,
-    model: str,
-    wiki_id: Optional[str],
-    page_id: Optional[str],
-    repo_id: Optional[str],
-    console: Console,
-) -> None:
-    """优化版的 Live 渲染，处理首包加载"""
-    from rich.console import Group
-
-    gen = send_repo_message_async(
-        talk_id, repo_path, question, None, model, lang, wiki_id, page_id, repo_id
-    )
-    it, first_chunk = await _get_first_async_chunk_with_status(
-        console, f"[dim]{tr('status.thinking', lang)}[/dim]", gen
-    )
-    if first_chunk is None:
-        return
-
-    # 进入 Live 渲染循环
-    reasoning_text = ""
-    answer_text = ""
-
-    # 辅助函数：处理 chunk 数据
-    def process_chunk(chunk):
-        nonlocal reasoning_text, answer_text
-        reasoning_text, answer_text = _merge_live_ai_chunk(
-            chunk, reasoning_text, answer_text
-        )
-
-    # 处理首个 chunk
-    process_chunk(first_chunk)
-
-    with Live(console=console, refresh_per_second=12, transient=False) as live:
-
-        def update_display():
-            panels = []
-            if reasoning_text:
-                panels.append(
-                    Panel(
-                        Text(reasoning_text.replace("\n", "  "), style="dim"),
-                        title=tr("messages.reasoning_title", lang),
-                        box=SIMPLE_HEAD,
-                        title_align="left",
-                    )
-                )
-            if answer_text:
-                text_display = _process_markdown_links(answer_text, repo_path)
-                panels.append(
-                    Panel(
-                        Markdown(text_display),
-                        title="🤖",
-                        border_style="green",
-                        title_align="left",
-                    )
-                )
-            if panels:
-                live.update(Group(*panels))
-
-        update_display()  # 渲染第一帧
-
-        async for chunk in it:
-            process_chunk(chunk)
-            update_display()
-
-
 # ==========================================
 # Export 功能：导出仓库文档到本地
 # ==========================================
@@ -5762,94 +3689,38 @@ async def _fetch_page_async(
     if not slug:
         return {"success": False, "page": page, "error": "no slug"}
 
-    if _DIRECT_MODE:
-        # 直连模式：slug 即文件路径，从 raw.githubusercontent 下载并保留目录结构
-        try:
-            parsed = parse_repo_url(repo)
-            owner, repo_name = parsed["owner"], parsed["repo"]
-            url = f"{GITHUB_RAW_URL}/{owner}/{repo_name}/HEAD/{slug}"
-            response = await client.get(
-                url, headers={"User-Agent": USER_AGENT}, timeout=30.0
-            )
-            if response.status_code == 404 and _GITHUB_TOKEN:
-                response = await client.get(
-                    url,
-                    headers={
-                        "User-Agent": USER_AGENT,
-                        "Authorization": f"Bearer {_GITHUB_TOKEN}",
-                    },
-                    timeout=30.0,
-                )
-            response.raise_for_status()
-            md_content = response.text
-
-            file_path = output_dir / slug
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            file_path.write_text(md_content, encoding="utf-8")
-
-            if progress_cb:
-                progress_cb()
-            return {
-                "success": True,
-                "page": page,
-                "content": md_content,
-                "file_path": file_path,
-            }
-        except Exception as e:
-            if progress_cb:
-                progress_cb()
-            return {"success": False, "page": page, "error": str(e)}
-
+    # slug 即文件路径，从 raw.githubusercontent 下载并保留目录结构
     try:
-        # 获取 markdown 内容
         parsed = parse_repo_url(repo)
-        zread_url = parsed["zread_url"]
-        url = f"{zread_url}/{slug}"
+        owner, repo_name = parsed["owner"], parsed["repo"]
+        url = f"{GITHUB_RAW_URL}/{owner}/{repo_name}/HEAD/{slug}"
         response = await client.get(
-            url,
-            cookies={"X-Locale": lang},
-            headers={**DEFAULT_HEADERS, "RSC": "1"},
-            timeout=30.0,
+            url, headers={"User-Agent": USER_AGENT}, timeout=30.0
         )
+        if response.status_code == 404 and _GITHUB_TOKEN:
+            response = await client.get(
+                url,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Authorization": f"Bearer {_GITHUB_TOKEN}",
+                },
+                timeout=30.0,
+            )
         response.raise_for_status()
-        content = response.content
+        md_content = response.text
 
-        # 解析 markdown 内容（复用 fetch_markdown 的逻辑）
-        marker = b",---"
-        end_pos = content.rfind(marker)
-        if end_pos == -1:
-            raise ValueError("Invalid response format: marker not found")
-
-        line_start = content.rfind(b"\n", 0, end_pos)
-        if line_start == -1:
-            line_start = 0
-        else:
-            line_start += 1
-
-        header_line = content[line_start : end_pos + 1].decode("latin-1")
-        head_pattern = re.compile(r"^([0-9a-f]+):T([0-9a-f]+),")
-        match = head_pattern.match(header_line)
-        if not match:
-            raise ValueError(f"Invalid header format: {header_line[:50]}")
-
-        byte_length = int(match.group(2), 16)
-        header_end = line_start + match.end()
-        md_content = content[header_end : header_end + byte_length].decode("utf-8")
-
-        # 保存到文件（直接放在 repo_dir 下）
-        file_path = output_dir / f"{slug}.md"
+        file_path = output_dir / slug
+        file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_text(md_content, encoding="utf-8")
 
         if progress_cb:
             progress_cb()
-
         return {
             "success": True,
             "page": page,
             "content": md_content,
             "file_path": file_path,
         }
-
     except Exception as e:
         if progress_cb:
             progress_cb()
@@ -6018,11 +3889,8 @@ def _generate_llms_full_txt(
     # 生成内容
     lines = []
     github_url = f"https://github.com/{owner}/{repo_name}"
-    zread_url = f"{BASE_URL}/{owner}/{repo_name}"
 
     lines.append(github_url)
-    if not _DIRECT_MODE:
-        lines.append(zread_url)
     lines.append("")
 
     # 添加 GitHub 仓库信息
@@ -6114,11 +3982,8 @@ def _generate_llms_txt(
     # 生成内容
     lines = []
     github_url = f"https://github.com/{owner}/{repo_name}"
-    zread_url = f"{BASE_URL}/{owner}/{repo_name}"
 
     lines.append(github_url)
-    if not _DIRECT_MODE:
-        lines.append(zread_url)
     lines.append("")
 
     # 添加 GitHub 仓库信息
@@ -6179,9 +4044,6 @@ def cmd_cp(
     concurrency: Annotated[
         int, typer.Option("--concurrency", "-c", help=tr("cli.options.concurrency"))
     ] = 10,
-    direct: Annotated[
-        bool, typer.Option("--direct", "-d", help=tr("cli.options.direct"))
-    ] = False,
 ) -> None:
     """导出仓库文档到本地
 
@@ -6196,8 +4058,6 @@ def cmd_cp(
         typer.echo(ctx.get_help())
         typer.echo(f"\n❌ {tr('errors.missing_repo')}", err=True)
         raise typer.Exit(1)
-    if direct:
-        set_direct_mode(True)
     lang = _resolve_lang(lang)
 
     # 默认输出到当前目录
@@ -6334,25 +4194,12 @@ def _run_mcp_server(
     host: str = "127.0.0.1",
     port: int = 8708,
     path: str = "/mcp",
-    token: Optional[str] = None,
 ) -> None:
-    """运行 MCP 服务器"""
-    # 如果命令行提供了 token，设置为全局 token
-    if token:
-        set_default_token(token)
-
-    # 确定是否有 token（直连模式下 AI 问答不可用，不注册 ask_ai）
-    has_token = bool(_DEFAULT_TOKEN) and not _DIRECT_MODE
-
-    mcp = _get_mcp(has_token)
+    """运行 MCP 服务器（所有工具基于 GitHub，无需账号 / token）"""
+    mcp = _get_mcp()
 
     # 打印启动信息到 stderr
-    if _DIRECT_MODE:
-        print(tr("mcp.direct_mode"), file=sys.stderr)
-    elif has_token:
-        print(tr("mcp.token_enabled"), file=sys.stderr)
-    else:
-        print(tr("mcp.token_missing"), file=sys.stderr)
+    print(tr("mcp.started"), file=sys.stderr)
 
     if transport == "stdio":
         # stdio 模式：完全禁用所有日志输出，避免污染 stdout

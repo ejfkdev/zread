@@ -1,202 +1,126 @@
 zh:
   cli:
-    app_help: "Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。\nhttps://github.com/valeriikot/zread"
-    env_vars_title: "环境变量"
-    env_var_token_desc: "zread.ai 登录账号的 JWT token，仅 AI 问答功能需要"
-    env_var_lang_desc: "默认语言（zh/en），优先级低于 --lang、高于系统locale"
-    env_var_model_desc: "默认 AI 模型（glm-5.1/claude-sonnet-4.6），优先级低于 --model"
-    env_var_direct_desc: "直连模式（1/true）：数据仅来自 GitHub，完全不访问 zread.ai"
-    env_var_github_token_desc: "可选的 GitHub token，直连模式使用（提升速率限制、访问私有仓库）"
-    show_version: "显示版本号"
-    show_help: "显示帮助信息"
+    app_help: 'Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。
+
+      https://github.com/valeriikot/zread'
+    env_vars_title: 环境变量
+    env_var_lang_desc: 默认语言（zh/en），优先级低于 --lang、高于系统locale
+    env_var_github_token_desc: 可选的 GitHub token，提升 API 速率限制并访问私有仓库
+    show_version: 显示版本号
+    show_help: 显示帮助信息
     commands:
-      mcp: "启动 MCP 服务器"
-      ls: "获取文档目录结构"
-      cat: "查看仓库内容，支持 zread 文档页面或 GitHub 文件"
-      find: "搜索 GitHub 仓库，或在指定仓库文档内搜索关键词"
-      top: "获取热门仓库榜单"
-      rand: "随机发现推荐仓库"
-      stat: "显示仓库信息"
-      ai: "向仓库 AI 提问（需要 token）"
-      cp: "导出仓库文档到本地，并生成 llms.txt / llms-full.txt"
-      install: "为 AI 编码智能体配置 zread MCP 服务（Claude Code / Codex / Hermes）"
+      mcp: 启动 MCP 服务器
+      ls: 获取文档目录结构
+      cat: 查看仓库的文档或源代码文件（来自 GitHub）
+      find: 搜索 GitHub 仓库，或在指定仓库文档内搜索关键词
+      top: 获取热门仓库榜单
+      rand: 随机发现推荐仓库
+      stat: 显示仓库信息
+      cp: 导出仓库文档到本地，并生成 llms.txt / llms-full.txt
+      install: 为 AI 编码智能体配置 zread MCP 服务（Claude Code / Codex / Hermes）
     args:
-      transport: "传输协议：stdio / sse / http"
-      address: "地址，支持：host、host:port、:port、host:port/path、:port/path（默认 127.0.0.1:8708）"
-      repo: "仓库路径，格式：owner/repo"
-      repo_optional: "仓库路径（可选，格式：owner/repo）"
-      repo_or_url: "仓库路径（owner/repo）或 GitHub URL"
-      path_or_slug: "zread slug（如：1-overview）或文件路径（如：README.md），默认 1-overview"
-      cat_extra: "可选：文件路径、起始行号或行号范围（如：5、5:20、Lib/http/client.py）"
-      query: "搜索关键词"
-      weeks: "显示最近几周内的榜单"
-      topic_optional: "GitHub topic 标签，如 python、awesome-list、agent-skills（可选）"
-      question_optional: "问题（可选，不传则进入交互模式）"
-      output_dir: "输出目录（默认：当前目录）"
-      agent: "目标智能体：claude-code / codex / hermes"
+      transport: 传输协议：stdio / sse / http
+      address: 地址，支持：host、host:port、:port、host:port/path、:port/path（默认 127.0.0.1:8708）
+      repo: 仓库路径，格式：owner/repo
+      repo_optional: 仓库路径（可选，格式：owner/repo）
+      repo_or_url: 仓库路径（owner/repo）或 GitHub URL
+      path_or_slug: 文档/文件路径（如：README.md、docs/guide.md），默认 README
+      cat_extra: 可选：文件路径、起始行号或行号范围（如：5、5:20、Lib/http/client.py）
+      query: 搜索关键词
+      weeks: 显示最近几周内的榜单
+      topic_optional: GitHub topic 标签，如 python、awesome-list、agent-skills（可选）
+      output_dir: 输出目录（默认：当前目录）
+      agent: 目标智能体：claude-code / codex / hermes
     options:
-      token: "ZREAD_TOKEN"
-      lang: "语言：zh / en"
-      json: "JSON 格式输出"
-      plain: "输出纯文本内容"
-      ai_plain: "只流式打印正文内容"
-      ai_json: "最终一次性返回思考和正文的 JSON"
-      model: "模型：glm-5.1 或 claude-sonnet-4.6（默认 glm-5.1，可通过 ZREAD_MODEL 环境变量或配置文件设置）"
-      concurrency: "并发数（默认：10）"
-      print_only: "仅打印配置内容，不做任何修改"
-      mcp_url: "共享 zread MCP 服务的 URL（HTTP 模式），如 http://zread.internal:8708/mcp——智能体将连接该地址而非启动本地进程"
-      direct: "直连模式：所有数据直接来自 GitHub，完全不访问 zread.ai（文档即仓库自带的 Markdown 文件）"
+      lang: 语言：zh / en
+      json: JSON 格式输出
+      plain: 输出纯文本内容
+      concurrency: 并发数（默认：10）
+      print_only: 仅打印配置内容，不做任何修改
+      mcp_url: 共享 zread MCP 服务的 URL（HTTP 模式），如 http://zread.internal:8708/mcp——智能体连接该地址而非启动本地进程
   status:
-    fetch_outline: "正在获取文档目录..."
-    fetch_page: "正在获取页面内容..."
-    locate_default_page: "正在定位默认页面..."
-    fetch_repo_info: "正在获取仓库信息..."
-    fetch_file_content: "正在获取文件内容..."
-    search_docs: "正在搜索文档..."
-    search_repos: "正在搜索仓库..."
-    fetch_trending: "正在获取热门仓库..."
-    fetch_recommend: "正在获取推荐仓库..."
-    preparing: "准备中..."
-    thinking: "思考中..."
-    downloading_repo: "📥 下载 %{repo}..."
+    fetch_outline: 正在获取文档目录...
+    fetch_page: 正在获取页面内容...
+    locate_default_page: 正在定位默认页面...
+    fetch_repo_info: 正在获取仓库信息...
+    fetch_file_content: 正在获取文件内容...
+    search_docs: 正在搜索文档...
+    search_repos: 正在搜索仓库...
+    fetch_trending: 正在获取热门仓库...
+    fetch_recommend: 正在获取推荐仓库...
+    downloading_repo: 📥 下载 %{repo}...
   errors:
-    missing_repo: "缺少必选参数：REPO（仓库路径，格式：owner/repo）"
-    missing_repo_or_url: "缺少必选参数：REPO_OR_URL（仓库路径或 GitHub URL）"
-    missing_query: "缺少必选参数：QUERY（搜索关键词）"
-    missing_agent: "缺少必选参数：AGENT（claude-code / codex / hermes）"
-    fetch_outline: "错误：无法获取文档目录"
-    fetch_repo_outline: "错误：无法获取仓库目录"
-    fetch_page: "错误：无法获取页面内容"
-    page_number_not_found: "错误：找不到序号 %{number} 的页面"
-    page_missing_slug: "错误：序号 %{number} 对应页面缺少 slug"
-    fetch_repo_metadata: "错误：无法获取仓库元数据"
-    fetch_repo_info: "错误：无法获取仓库信息"
-    repo_not_found: "错误：无法获取仓库信息，仓库不存在"
-    fetch_repo_status: "错误：无法获取仓库状态"
-    search_failed: "搜索失败"
-    fetch_trending: "无法获取热门仓库"
-    fetch_recommend: "无法获取推荐仓库"
-    ai_requires_token: |
-      错误：ai 命令需要 ZREAD_TOKEN
-
-      获取 Token（登录 https://zread.ai 后）：
-      1. 按 F12 打开浏览器控制台
-      2. 粘贴运行：
-         prompt("复制token", JSON.parse(localStorage.getItem("CGX_AUTH_STORAGE")).state.token)
-      3. 复制弹窗中的 Token
-
-      配置 Token（任选其一）：
-      - 环境变量：export ZREAD_TOKEN='your-token-here'
-      - 配置文件：~/.config/zread/zread.toml
-        [zread]
-        token = "your-token-here"
-
-      或直接通过命令行传入：zread ai <repo> <question> -t your-token
-    create_talk: "错误：无法创建对话"
-    repo_not_indexed: "错误：仓库尚未被 zread 收录，已在后台提交索引，请稍后重试或先执行 `zread stat %{repo}` 查看状态"
-    repo_indexing: "错误：仓库正在索引中，请稍后重试或先执行 `zread stat %{repo}` 查看状态"
-    repo_missing_docs: "错误：仓库缺少可用文档索引，暂时无法进行 AI 对话"
-    repo_ai_unavailable: "错误：仓库当前不可用于 AI 对话"
-    export_failed_with_reason: "❌ 导出失败：%{error}"
-    error_prefix: "错误："
-    http_request_failed: "HTTP 请求失败"
-    network_error_with_context: "%{context} - 网络错误：%{error}"
-    json_parse_error_with_context: "%{context} - JSON 解析错误：%{error}"
-    parse_json_failed: "解析 JSON 失败：%{error}"
-    parse_data_structure_failed: "解析数据结构失败：%{error}"
-    search_wiki_network_failed: "搜索 Wiki 网络请求失败：%{error}"
-    search_wiki_parse_failed: "搜索 Wiki 响应解析失败：%{error}"
-    create_talk_failed_with_reason: "创建对话失败：%{detail}"
-    create_talk_network_failed: "创建对话网络请求失败：%{error}"
-    create_talk_parse_failed: "创建对话响应解析失败：%{error}"
-    send_message_async_failed: "异步发送消息失败：%{error}"
-    repo_has_no_pages: "错误：仓库没有页面"
-    recommend_failed_with_reason: "推荐仓库失败：%{detail}"
-    recommend_network_failed: "推荐仓库网络请求失败：%{error}"
-    recommend_parse_failed: "推荐仓库响应解析失败：%{error}"
-    search_repo_failed_with_reason: "搜索仓库失败：%{detail}"
-    search_repo_network_failed: "搜索仓库网络请求失败：%{error}"
-    search_repo_parse_failed: "搜索仓库响应解析失败：%{error}"
-    invalid_repo_format: "请使用 owner/repo 格式，例如：openclaw/openclaw"
-    get_repo_info_failed_with_reason: "获取仓库信息失败：%{detail}"
-    get_repo_info_network_failed: "获取仓库信息网络请求失败：%{error}"
-    get_repo_info_parse_failed: "获取仓库信息响应解析失败：%{error}"
-    submit_repo_failed_with_reason: "提交索引失败：%{detail}"
-    submit_repo_network_failed: "提交索引网络请求失败：%{error}"
-    submit_repo_parse_failed: "提交索引响应解析失败：%{error}"
-    refresh_repo_network_failed: "刷新索引网络请求失败：%{error}"
-    fetch_repo_info_for_file_failed: "无法获取仓库信息：%{repo}"
-    repo_info_missing_repo_id: "仓库信息中缺少 repo_id"
-    fetch_file_failed_with_reason: "获取文件失败：%{detail}"
-    file_not_found_or_inaccessible: "文件不存在或无法访问"
-    fetch_file_network_failed: "获取文件内容网络请求失败：%{error}"
-    fetch_file_parse_failed: "获取文件内容响应解析失败：%{error}"
-    fetch_file_data_parse_failed: "获取文件内容数据解析失败：%{error}"
-    parse_repo_and_file_failed: "错误：无法解析仓库路径和文件路径"
-    fetch_file_content: "错误：无法获取文件内容"
-    ai_session_create_failed: "❌ AI 会话创建失败"
-    fetch_repo_info_retry: "❌ 无法获取仓库信息，请稍后重试"
-    fetch_repo_outline_failed: "❌ 获取仓库目录失败"
-    fetch_page_for_slug_failed: "❌ 无法获取页面内容：%{slug}"
-    fetch_recommend_repo_failed: "❌ 获取推荐仓库失败"
-    search_repo_failed: "❌ 搜索仓库失败"
-    fetch_trending_repo_failed: "❌ 获取热门仓库失败"
-    fetch_repo_info_failed: "❌ 获取仓库信息失败"
-    fetch_file_failed_for_path: "❌ 无法获取文件：%{path}"
-    github_request_failed: "GitHub 请求失败：%{error}"
-    github_rate_limited: "GitHub API 速率限制已用尽，可设置 GITHUB_TOKEN 环境变量提升限额。"
-    ai_direct_mode: "AI 问答由 zread.ai 提供，直连模式下不可用。去掉 --direct / ZREAD_DIRECT 后即可使用。"
+    missing_repo: 缺少必选参数：REPO（仓库路径，格式：owner/repo）
+    missing_repo_or_url: 缺少必选参数：REPO_OR_URL（仓库路径或 GitHub URL）
+    missing_query: 缺少必选参数：QUERY（搜索关键词）
+    missing_agent: 缺少必选参数：AGENT（claude-code / codex / hermes）
+    fetch_outline: 错误：无法获取文档目录
+    fetch_repo_outline: 错误：无法获取仓库目录
+    fetch_page: 错误：无法获取页面内容
+    page_number_not_found: 错误：找不到序号 %{number} 的页面
+    page_missing_slug: 错误：序号 %{number} 对应页面缺少 slug
+    fetch_repo_info: 错误：无法获取仓库信息
+    repo_not_found: 错误：无法获取仓库信息，仓库不存在
+    search_failed: 搜索失败
+    fetch_trending: 无法获取热门仓库
+    fetch_recommend: 无法获取推荐仓库
+    export_failed_with_reason: ❌ 导出失败：%{error}
+    http_request_failed: HTTP 请求失败
+    invalid_repo_format: 请使用 owner/repo 格式，例如：openclaw/openclaw
+    file_not_found_or_inaccessible: 文件不存在或无法访问
+    parse_repo_and_file_failed: 错误：无法解析仓库路径和文件路径
+    fetch_file_content: 错误：无法获取文件内容
+    fetch_repo_outline_failed: ❌ 获取仓库目录失败
+    fetch_page_for_slug_failed: ❌ 无法获取页面内容：%{slug}
+    fetch_recommend_repo_failed: ❌ 获取推荐仓库失败
+    search_repo_failed: ❌ 搜索仓库失败
+    fetch_trending_repo_failed: ❌ 获取热门仓库失败
+    fetch_repo_info_failed: ❌ 获取仓库信息失败
+    fetch_file_failed_for_path: ❌ 无法获取文件：%{path}
+    github_request_failed: GitHub 请求失败：%{error}
+    github_rate_limited: GitHub API 速率限制已用尽，可设置 GITHUB_TOKEN 环境变量提升限额。
   messages:
-    no_results: "无结果"
-    unknown_error: "未知错误"
-    no_description: "无描述"
-    no_pages: "(暂无页面)"
-    no_preview: "无预览内容"
-    ai_mode_title: "进入 AI 对话模式"
-    ai_mode_hint: "输入消息后按 Enter 发送，输入 exit 退出"
-    repo_label: "仓库"
-    reasoning_title: "💭 思考过程"
-    set_token_for_ai: "🔑 请先设置 ZREAD_TOKEN 环境变量以使用 AI 对话功能"
-    ai_no_valid_reply: "🤖 AI 未返回有效回复"
-    file_info: "📄 %{file_path} | 总行数：%{total_lines} | 大小：%{size}"
-    file_info_showing_lines: " | 显示：%{start}-%{end} 行"
-    exporting_repo: "📦 正在导出：%{repo}"
-    output_dir: "📁 输出目录：%{path}"
-    language_label: "🌐 语言：%{lang_code}"
-    concurrency_label: "⚡ 并发数：%{concurrency}"
-    export_complete: "✅ 导出完成！"
-    export_total: "   总计：%{count} 页"
-    export_success: "   成功：%{count} 页"
-    export_failed: "   失败：%{count} 页"
-    export_repo_dir: "📄 文档目录：%{path}"
-    export_llms_file: "📄 llms.txt（目录索引）：%{path}"
-    export_llms_full_file: "📄 llms-full.txt（完整内容）：%{path}"
-    export_failed_pages: "⚠️ 以下页面导出失败："
-    direct_trending_title: "GitHub：本周新建仓库星标榜"
+    no_results: 无结果
+    unknown_error: 未知错误
+    no_description: 无描述
+    no_pages: (暂无页面)
+    no_preview: 无预览内容
+    file_info: 📄 %{file_path} | 总行数：%{total_lines} | 大小：%{size}
+    file_info_showing_lines: ' | 显示：%{start}-%{end} 行'
+    exporting_repo: 📦 正在导出：%{repo}
+    output_dir: 📁 输出目录：%{path}
+    language_label: 🌐 语言：%{lang_code}
+    concurrency_label: ⚡ 并发数：%{concurrency}
+    export_complete: ✅ 导出完成！
+    export_total: '   总计：%{count} 页'
+    export_success: '   成功：%{count} 页'
+    export_failed: '   失败：%{count} 页'
+    export_repo_dir: 📄 文档目录：%{path}
+    export_llms_file: 📄 llms.txt（目录索引）：%{path}
+    export_llms_full_file: 📄 llms-full.txt（完整内容）：%{path}
+    export_failed_pages: ⚠️ 以下页面导出失败：
+    direct_trending_title: GitHub：本周新建仓库星标榜
   install:
-    unknown_agent: "未知的智能体：%{agent}（支持：%{supported}）"
-    running: "正在执行：%{command}"
-    command_failed: "❌ 命令执行失败（退出码 %{code}），可使用 `zread install <agent> --print` 查看配置后手动添加"
-    cli_not_found: "⚠️ 未找到 `%{cli}` 命令行工具，请手动配置："
-    manual_run: "执行以下命令："
-    manual_file: "或将以下配置添加到 %{path}："
-    snippet_hint: "将以下配置添加到 %{path}："
-    yaml_missing: "⚠️ 未安装 PyYAML，请手动添加以下配置："
-    config_parse_failed: "❌ 解析 %{path} 失败：%{error}"
-    backup_saved: "📦 已备份原配置到 %{path}"
-    written: "📝 配置已更新：%{path}"
-    success: "已为 %{agent} 配置 zread MCP 服务"
-    no_token_hint: "💡 未配置 ZREAD_TOKEN：ask_ai 工具将不可用。可在 https://zread.ai 免费获取 token（见 README），然后使用 -t your-token 重新执行"
+    unknown_agent: 未知的智能体：%{agent}（支持：%{supported}）
+    running: 正在执行：%{command}
+    command_failed: ❌ 命令执行失败（退出码 %{code}），可使用 `zread install <agent> --print` 查看配置后手动添加
+    cli_not_found: ⚠️ 未找到 `%{cli}` 命令行工具，请手动配置：
+    manual_run: 执行以下命令：
+    manual_file: 或将以下配置添加到 %{path}：
+    snippet_hint: 将以下配置添加到 %{path}：
+    yaml_missing: ⚠️ 未安装 PyYAML，请手动添加以下配置：
+    config_parse_failed: ❌ 解析 %{path} 失败：%{error}
+    backup_saved: 📦 已备份原配置到 %{path}
+    written: 📝 配置已更新：%{path}
+    success: 已为 %{agent} 配置 zread MCP 服务
   mcp:
-    direct_mode: "🔗 直连模式：数据直接来自 GitHub，不访问 zread.ai。ask_ai 工具不可用。"
-    token_enabled: "🔑 已配置 ZREAD_TOKEN。"
-    token_missing: "📝 未配置 ZREAD_TOKEN。获取方式：访问 https://zread.ai 登录后，按 F12 打开控制台并运行 prompt('复制token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)。"
-    sse_started: "启动 SSE 模式：%{url}"
-    http_started: "启动 HTTP 模式：%{url}"
+    sse_started: 启动 SSE 模式：%{url}
+    http_started: 启动 HTTP 模式：%{url}
+    started: 🚀 zread MCP 服务已就绪——所有工具直接来自 GitHub，无需任何账号。
   config:
-    title: "配置文件"
-    macos: "macOS 配置文件"
-    linux: "Linux 配置文件"
-    windows: "Windows 配置文件"
-    found: "配置文件已找到：%{path}"
-    not_found: "配置文件不存在（可选）"
+    title: 配置文件
+    macos: macOS 配置文件
+    linux: Linux 配置文件
+    windows: Windows 配置文件
+    found: 配置文件已找到：%{path}
+    not_found: 配置文件不存在（可选）
