@@ -1,10 +1,13 @@
-# zread MCP server — company-wide deployment image
+# zread MCP server — self-hosted, company-wide deployment image
+#
+# All data comes straight from GitHub; no external SaaS, no account, no token.
 #
 # Build:
 #   docker build -t zread-mcp .
 #
 # Run the shared MCP server (HTTP mode, endpoint: http://<host>:8708/mcp):
-#   docker run -d --name zread-mcp -p 8708:8708 -e ZREAD_TOKEN=... zread-mcp
+#   docker run -d --name zread-mcp -p 8708:8708 zread-mcp
+#   # optional: -e GITHUB_TOKEN=... for higher API limits / private repos
 #
 # The full CLI is available in the same image:
 #   docker exec zread-mcp zread ls golang/go -p
@@ -44,12 +47,8 @@ RUN useradd --create-home --uid 1000 zread
 USER zread
 
 # Configuration (set at run time):
-#   ZREAD_TOKEN      zread.ai account token, enables the ask_ai tool
-#   ZREAD_DIRECT     1/true = direct mode, never contact zread.ai
-#   GITHUB_TOKEN     raises GitHub API limits in direct mode
+#   GITHUB_TOKEN     optional, raises GitHub API limits / enables private repos
 #   ZREAD_LANG       zh / en (default: en for a shared server)
-#   ZREAD_MODEL      default AI model for ask_ai
-#   ZREAD_BASE_URL   self-hosted zread-compatible API
 ENV ZREAD_LANG=en
 
 EXPOSE 8708

@@ -1,7 +1,7 @@
 [project]
 name = "zread"
 dynamic = ["version"]
-description = "Zread 让你和你的 AI 都更懂代码。代码不用看，直接问。连接 zread.ai，AI 驱动的 GitHub 项目文档。"
+description = "Standalone GitHub docs & code reader for your terminal and AI agents (CLI + MCP server). Reads repository docs and source straight from GitHub — no account, no external service."
 readme = "README.md"
 authors = [
     { name = "ejfkdev", email = "152914458+ejfkdev@users.noreply.github.com" },

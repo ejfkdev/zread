@@ -1,130 +1,53 @@
-# Zread - AI Repository Reading Assistant
+# Zread — GitHub Docs & Code for Your Terminal and AI Agents
 
 [中文](README.zh.md) | English
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS42MDE1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/valeriikot/zread)
 [![MCP](https://img.shields.io/badge/MCP-Protocol-green)](https://modelcontextprotocol.io/)
 [![CLI](https://img.shields.io/badge/Interface-CLI-2E8B57)](https://pypi.org/project/zread/)
 [![Transport](https://img.shields.io/badge/Transport-stdio%20%7C%20http%20%7C%20sse-6A5ACD)](https://github.com/valeriikot/zread)
 [![I18N](https://img.shields.io/badge/I18N-zh%20%7C%20en-FF8C00)](https://github.com/valeriikot/zread)
-[![PyPI](https://img.shields.io/badge/PyPI-zread-blue)](https://pypi.org/project/zread/)
-[![Downloads](https://img.shields.io/pypi/dm/zread)](https://pypi.org/project/zread/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Zread helps you and your AI understand codebases faster. Skip the manual source dive and ask directly. It connects to [Zread.ai](https://zread.ai), an AI-powered GitHub project documentation service.
+Read any GitHub repository's docs and source — from your terminal or from an AI coding agent — **straight from GitHub**. No account, no API key, no external service to sign up for. Everything is backed by the public GitHub API and `raw.githubusercontent.com`; an optional `GITHUB_TOKEN` just raises rate limits and unlocks private repos.
+
+> This is a **standalone fork** of [ejfkdev/zread](https://github.com/ejfkdev/zread). The original connects to the zread.ai SaaS for AI-generated wikis and Q&A; this fork removes that dependency entirely and serves everything directly from GitHub, so you can self-host it with zero third-party accounts.
 
 **Two roles**:
 
-- 🖥️ **CLI tool** - run directly in your terminal with minimal setup
-- 🔌 **MCP server** - integrate with AI coding agents such as Claude Code, Codex, Hermes Agent, and Cline
+- 🖥️ **CLI tool** — run directly in your terminal with minimal setup
+- 🔌 **MCP server** — integrate with AI coding agents such as Claude Code, Codex, Hermes Agent, and Cline
 
 **Highlights**:
 
-- 🔍 Browse docs, search code, and discover repositories without a token
-- 🤖 AI Q&A powered by repository documentation
-- 🔗 Direct mode: run fully disconnected from zread.ai, backed by GitHub only
+- 🔒 No account, no token, no SaaS — data comes straight from GitHub
+- 📖 Read a repo's docs (README, `docs/`, …) and any source file, with line ranges
+- 🔍 Search a repo's docs, and search / discover repositories via the GitHub API
 - 🛠️ One-command setup for Claude Code, Codex, and Hermes Agent (`zread install`)
-- 🏢 Company-wide deployment: one shared Dockerized MCP server for the whole team
+- 🏢 Self-host one shared Dockerized MCP server for your whole team
 - 🌐 Multiple transports: stdio, HTTP, and SSE
-- ⚡ One command to run, zero-friction startup
 
 ## Table of Contents
 
 - [Features](#features)
-- [Screenshots](#screenshots)
-- [Quick Start](#quick-start) — [CLI](#cli-tool) · [from source](#install-from-source) · [MCP server](#mcp-server) · [AI Q&A](#ai-qa)
+- [Quick Start](#quick-start) — [CLI](#cli-tool) · [from source](#install-from-source) · [MCP server](#mcp-server)
 - [CLI Commands](#cli-commands) — [global options](#global-options) · [examples](#examples)
 - [MCP Client Configuration](#mcp-client-configuration) — [Claude Code](#claude-code) · [Codex](#codex) · [Hermes Agent](#hermes-agent)
-- [Company-wide Deployment (Docker)](#company-wide-deployment-docker)
+- [Self-hosted Deployment (Docker)](#self-hosted-deployment-docker)
 - [MCP Tools](#mcp-tools)
-- [Usage Without a Zread.ai Account](#usage-without-a-zreadai-account) — [direct mode](#direct-mode-no-connection-to-zreadai-at-all)
-- [Get a Token](#get-a-token)
+- [GitHub Token (optional)](#github-token-optional)
 - [Environment Variables](#environment-variables)
 - [Configuration File](#configuration-file)
 
 ## Features
 
-- 📖 **Read docs** - browse GitHub repository docs directly in the terminal
-- 🔍 **Search docs** - search keywords across repository documentation
-- 🌟 **Discover repos** - browse trending rankings and recommended projects
-- 📥 **Export docs** - export repository docs locally and generate `llms.txt` and `llms-full.txt` (CLI only)
-- 🤖 **AI Q&A** - ask the repository AI assistant questions (requires a free account token)
-- 📄 **Read source files** - inspect source file contents directly
-- 🔌 **MCP integration** - connect seamlessly with AI coding agents (`zread install claude-code|codex|hermes`)
-- 🔗 **Direct mode** - every feature except AI Q&A also works straight against GitHub, with zero zread.ai contact (`--direct`)
-- 🏢 **Docker deployment** - ship one shared MCP server for your whole organization
-
-## Screenshots
-
-<table>
-  <tr>
-    <td align="center">
-      <strong>Help</strong><br>
-      <code>zread -h</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/help.png" alt="zread help" width="100%">
-    </td>
-    <td align="center">
-      <strong>Documentation Outline</strong><br>
-      <code>zread ls openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/ls.png" alt="zread ls" width="100%">
-    </td>
-    <td align="center">
-      <strong>Read a Doc Page</strong><br>
-      <code>zread cat openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/cat-wiki.png" alt="zread cat wiki" width="100%">
-    </td>
-    <td align="center">
-      <strong>Read a GitHub File</strong><br>
-      <code>zread cat facebook/react README.md</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/cat-github.png" alt="zread cat github" width="100%">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Search Repositories</strong><br>
-      <code>zread find ai sandbox</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/find-repo.png" alt="zread find repo" width="100%">
-    </td>
-    <td align="center">
-      <strong>Search Documentation</strong><br>
-      <code>zread find openclaw/openclaw gateway</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/find-wiki.png" alt="zread find wiki" width="100%">
-    </td>
-    <td align="center">
-      <strong>Trending Repos</strong><br>
-      <code>zread top</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/top.png" alt="zread top" width="100%">
-    </td>
-    <td align="center">
-      <strong>Random Recommendation</strong><br>
-      <code>zread rand agent-skills</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/rand.png" alt="zread rand" width="100%">
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Single-turn AI Q&A</strong><br>
-      <code>zread ai openclaw/openclaw "introduce this project briefly"</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/ai-ask.png" alt="zread ai ask" width="100%">
-    </td>
-    <td align="center">
-      <strong>Interactive AI Chat</strong><br>
-      <code>zread ai openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/ai-chat.png" alt="zread ai chat" width="100%">
-    </td>
-    <td align="center">
-      <strong>Export Repository Docs</strong><br>
-      <code>zread cp openclaw/openclaw</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/cp.png" alt="zread cp" width="100%">
-    </td>
-    <td align="center">
-      <strong>MCP HTTP Service</strong><br>
-      <code>zread mcp http :8080</code><br><br>
-      <img src="https://raw.githubusercontent.com/valeriikot/zread/refs/heads/main/image/mcp-http.png" alt="zread mcp http" width="100%">
-    </td>
-  </tr>
-</table>
+- 📖 **Read docs** — browse a repository's own Markdown docs (README, `docs/`, …) in the terminal
+- 🔍 **Search docs** — keyword search across a repository's Markdown files
+- 🌟 **Discover repos** — trending and recommended repositories via GitHub search
+- 📄 **Read source files** — inspect any file's contents, optionally by line range
+- 📥 **Export docs** — export a repo's docs locally and generate `llms.txt` / `llms-full.txt` (CLI only)
+- 🔌 **MCP integration** — connect AI coding agents in one command (`zread install claude-code|codex|hermes`)
+- 🏢 **Docker deployment** — self-host one shared MCP server for your whole organization
 
 ## Quick Start
 
@@ -167,71 +90,51 @@ The whole CLI lives in a single file with inline script metadata ([PEP 723](http
 ### MCP Server
 
 ```bash
-# stdio mode
+# stdio mode (for a local agent)
 uvx zread mcp
 
-# HTTP mode
+# HTTP mode (for a shared/self-hosted server)
 uvx zread mcp http
 ```
 
-### AI Q&A
-
-AI Q&A requires a free token from your [Zread.ai](https://zread.ai) account.
-
-**Set your token:**
-
-```bash
-export ZREAD_TOKEN=your-token
-```
-
-**Usage:**
-
-```bash
-# Interactive multi-turn chat
-zread ai openclaw/openclaw
-
-# Single question
-zread ai facebook/react "How is this project structured?"
-```
+No token or account is required — the server exposes all tools immediately.
 
 ## CLI Commands
 
 ```bash
 # Start the MCP server
-zread mcp [stdio|http|sse] [address] [-t token] [-l zh|en] [-d]
+zread mcp [stdio|http|sse] [address] [-l zh|en]
 
-# Show the documentation outline
-zread ls <repo> [-l zh|en] [-j] [-p] [-d]
+# List a repository's docs (its own Markdown files)
+zread ls <repo> [-l zh|en] [-j] [-p]
 
-# Read a documentation page or a source file
-zread cat <repo> [slug_or_path] [-l zh|en] [-j] [-p] [-d]
+# Read a doc or a source file
+zread cat <repo> [path] [-l zh|en] [-j] [-p]
 #
 # Automatic argument detection:
-# - If the first argument is only repo and the second is a slug/index (for example 1-overview, 1), it reads a zread doc page
-# - Other forms (for example README.md, owner/repo/README.md#L1-10, github.com/owner/repo/README.md#L1-10) read a GitHub file
+# - `zread cat owner/repo` reads the README
+# - `zread cat owner/repo docs/guide.md` reads that file
+# - github.com/owner/repo/README.md#L1-10 and owner/repo/README.md#L1-10 also work
 
 # Search
 zread find <query>                        # Search GitHub repositories
 zread find <repo> <query>                 # Search within a repository's docs
 
-# Discover recommended repositories
-zread rand [topic] [-l zh|en] [-j] [-p] [-d]
+# Discover repositories
+zread rand [topic] [-l zh|en] [-j] [-p]
 
 # Show trending repositories
-zread top [weeks] [-l zh|en] [-j] [-p] [-d]
+zread top [weeks] [-l zh|en] [-j] [-p]
 
-# Show repository status and metadata (silently submits unindexed repos and refreshes stale docs)
-zread stat <repo> [-l zh|en] [-j] [-p] [-d]
+# Show repository information
+zread stat <repo> [-l zh|en] [-j] [-p]
 
-# Ask the repository AI (requires a free account token; not available in direct mode)
-zread ai <repo> [question] [-l zh|en] [-t token] [-p] [-j] [-m model]
-
-# Export repository docs locally and generate llms.txt / llms-full.txt
-zread cp <repo> [output_dir] [-l zh|en] [-c concurrency] [-d]
+# Export a repo's docs locally and generate llms.txt / llms-full.txt
+zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
 
 # Configure the zread MCP server for an AI coding agent
 # (local stdio by default; -u points the agent at a shared HTTP server)
-zread install <claude-code|codex|hermes> [-t token] [-u url] [-p]
+zread install <claude-code|codex|hermes> [-u url] [-p]
 ```
 
 ### Global Options
@@ -240,11 +143,9 @@ The CLI supports plain text and JSON output and works well in pipelines:
 
 | Option               | Description                                                            |
 | -------------------- | ---------------------------------------------------------------------- |
-| `-l, --lang {zh,en}` | Language priority: `--lang` > `ZREAD_LANG` > system locale, default `en`. |
+| `-l, --lang {zh,en}` | Language priority: `--lang` > `ZREAD_LANG` > system locale, default `en` |
 | `-j, --json`         | Output as JSON                                                         |
 | `-p, --plain`        | Output plain text                                                      |
-| `-t, --token`        | ZREAD_TOKEN                                                            |
-| `-d, --direct`       | Direct mode: fetch from GitHub only, never contact zread.ai           |
 | `-h, --help`         | Show help                                                              |
 | `-v, --version`      | Show version                                                           |
 
@@ -257,48 +158,32 @@ uvx zread mcp http                     # HTTP mode
 uvx zread mcp http :8080               # Custom port
 uvx zread mcp http 0.0.0.0:3000/custom # Custom address and path
 
-# Docs
+# Docs & source
 uvx zread ls golang/go
-uvx zread cat vuejs/vue
-uvx zread cat vuejs/vue 1
-uvx zread cat vuejs/vue 1-overview
+uvx zread cat vuejs/vue                 # README
 uvx zread cat golang/go README.md
+uvx zread cat golang/go docs/README.md
 uvx zread cat python/cpython Lib/http/client.py
 uvx zread cat github.com/facebook/react/README.md#L1-10
-uvx zread cat facebook/react/README.md#L1-10
 uvx zread cat facebook/react README.md 5 10
 uvx zread cat facebook/react README.md 5-10
-uvx zread cat facebook/react README.md 5~
-uvx zread cat facebook/react/README.md 5:
-uvx zread find facebook/react hooks
+uvx zread find golang/go goroutine      # grep the repo's Markdown docs
 
 # Discovery
 uvx zread top
 uvx zread top 4
 uvx zread rand python
 uvx zread rand awesome-list
-
-# Repository info
 uvx zread stat torvalds/linux
-
-# AI Q&A
-uvx zread ai golang/go "How do I choose between channels and mutexes?" -t your-token
-uvx zread ai python/cpython --model claude-sonnet-4.6 -t your-token
-uvx zread ai rust-lang/rust
 
 # Export docs
 uvx zread cp golang/go
 uvx zread cp python/cpython -l zh
 uvx zread cp vuejs/vue -c 20
 
-# Direct mode (GitHub only, no zread.ai)
-uvx zread ls golang/go -d
-uvx zread cat golang/go docs/README.md -d
-uvx zread find golang/go goroutine -d
-
 # Configure AI coding agents
 uvx zread install claude-code
-uvx zread install codex -t your-token
+uvx zread install codex
 uvx zread install hermes --print
 uvx zread install claude-code --url http://zread.internal:8708/mcp
 ```
@@ -310,17 +195,17 @@ uvx zread install claude-code --url http://zread.internal:8708/mcp
 The `install` command configures the zread MCP server for popular AI coding agents:
 
 ```bash
-uvx zread install claude-code -t your-token   # Claude Code (runs `claude mcp add`)
-uvx zread install codex -t your-token         # OpenAI Codex CLI (runs `codex mcp add`)
-uvx zread install hermes -t your-token        # Hermes Agent (writes ~/.hermes/config.yaml)
+uvx zread install claude-code   # Claude Code (runs `claude mcp add`)
+uvx zread install codex         # OpenAI Codex CLI (prints the config.toml snippet)
+uvx zread install hermes        # Hermes Agent (writes ~/.hermes/config.yaml)
 ```
 
-The token is optional — without it everything works except the `ask_ai` tool. Add `-p` / `--print` to only print the configuration instead of applying it.
+Add `-p` / `--print` to only print the configuration instead of applying it, and `-u <url>` to point the agent at a shared HTTP server (see [Self-hosted Deployment](#self-hosted-deployment-docker)).
 
 ### Claude Code
 
 ```bash
-claude mcp add --scope user --env ZREAD_TOKEN=your-token zread -- uvx zread mcp
+claude mcp add --scope user zread -- uvx zread mcp
 ```
 
 Or add to `~/.claude.json` (user scope) / `.mcp.json` (project scope):
@@ -330,8 +215,7 @@ Or add to `~/.claude.json` (user scope) / `.mcp.json` (project scope):
   "mcpServers": {
     "zread": {
       "command": "uvx",
-      "args": ["zread", "mcp"],
-      "env": { "ZREAD_TOKEN": "your-token" }
+      "args": ["zread", "mcp"]
     }
   }
 }
@@ -340,7 +224,7 @@ Or add to `~/.claude.json` (user scope) / `.mcp.json` (project scope):
 ### Codex
 
 ```bash
-codex mcp add --env ZREAD_TOKEN=your-token zread -- uvx zread mcp
+codex mcp add zread -- uvx zread mcp
 ```
 
 Or add to `~/.codex/config.toml`:
@@ -349,9 +233,6 @@ Or add to `~/.codex/config.toml`:
 [mcp_servers.zread]
 command = "uvx"
 args = ["zread", "mcp"]
-
-[mcp_servers.zread.env]
-ZREAD_TOKEN = "your-token"
 ```
 
 ### Hermes Agent
@@ -363,38 +244,34 @@ mcp_servers:
   zread:
     command: "uvx"
     args: ["zread", "mcp"]
-    env:
-      ZREAD_TOKEN: "your-token"
 ```
 
 ### Other MCP clients
 
-Add the following configuration to any MCP-compatible client:
+Add the following to any MCP-compatible client:
 
 ```json
 {
   "mcpServers": {
     "zread": {
       "command": "uvx",
-      "args": ["zread", "mcp"],
-      "env": { "ZREAD_TOKEN": "your-token" }
+      "args": ["zread", "mcp"]
     }
   }
 }
 ```
 
-## Company-wide Deployment (Docker)
+## Self-hosted Deployment (Docker)
 
-Instead of every engineer running a local `uvx zread mcp` process per machine, you can run **one shared zread MCP service** for the whole company and point every AI agent at it. Configuration (zread.ai token, direct mode, GitHub token) lives in one place, and clients need zero local setup beyond a URL.
+Instead of every engineer running a local `uvx zread mcp` process, you can run **one shared zread MCP service** for the whole team and point every AI agent at it. There is no SaaS to depend on and nothing to authenticate against upstream — the container just talks to GitHub.
 
 ### Run the server
 
 ```bash
 # One-off
 docker build -t zread-mcp .
-docker run -d --name zread-mcp -p 8708:8708 \
-  -e ZREAD_TOKEN=your-token \
-  zread-mcp
+docker run -d --name zread-mcp -p 8708:8708 zread-mcp
+#   optional: -e GITHUB_TOKEN=... for higher API limits / private repos
 
 # Or with compose (recommended): copy .env.example to .env, edit, then
 docker compose up -d
@@ -402,7 +279,7 @@ docker compose up -d
 
 The shared MCP endpoint is `http://<your-host>:8708/mcp` (streamable HTTP).
 
-Server-side environment variables (see `.env.example`): `ZREAD_TOKEN` (enables `ask_ai` for everyone without distributing the token), `ZREAD_DIRECT` (company-wide direct mode, no zread.ai), `GITHUB_TOKEN`, `ZREAD_LANG`, `ZREAD_MODEL`, `ZREAD_BASE_URL`.
+Server-side environment variables (see `.env.example`): `GITHUB_TOKEN` (optional — higher rate limits, private repos) and `ZREAD_LANG`.
 
 ### Connect your agents
 
@@ -443,135 +320,40 @@ docker exec zread-mcp zread ls golang/go -p
 docker run --rm zread-mcp top -p
 ```
 
-> Note: the MCP endpoint has no built-in authentication — deploy it on your internal network or behind a reverse proxy that handles auth/TLS.
+> Note: the MCP endpoint has no built-in authentication — deploy it on your internal network or behind a reverse proxy that handles auth/TLS. For a corporate TLS-inspecting proxy, pass its CA at build time: `docker build --build-arg EXTRA_CA_CERT="$(cat ca.pem)" -t zread-mcp .`
 
 ## MCP Tools
 
-| Tool              | Description                                                                 | In direct mode |
-| ----------------- | --------------------------------------------------------------------------- | -------------- |
-| `read_doc`        | Get the content of a specific documentation page                            | ✅ repo markdown file |
-| `search_wiki`     | Search keywords in repository documentation                                 | ✅ grep over repo docs |
-| `get_doc_outline` | Get the repository documentation outline                                    | ✅ repo markdown tree |
-| `discover_repo`   | Discover a recommended repository at random                                 | ✅ GitHub search |
-| `get_trending`    | Get trending repository rankings                                            | ✅ GitHub search |
-| `get_repo_info`   | Get repository information and indexing status                              | ✅ GitHub repos API |
-| `read_source_file`| Read source code file contents                                              | ✅ raw.githubusercontent |
-| `ask_ai`          | Ask the repository AI a question (token required), supports `glm-5.1` and `claude-sonnet-4.6` | ❌ not registered |
+All tools are backed by GitHub and need no account or token:
 
-`ask_ai` is registered only when the server has a `ZREAD_TOKEN` and is not running in direct mode.
+| Tool               | Description                                          | Backed by |
+| ------------------ | ---------------------------------------------------- | --------- |
+| `read_doc`         | Read a documentation page (a repo Markdown file)     | raw.githubusercontent |
+| `search_wiki`      | Keyword-search a repository's Markdown docs          | GitHub tree + raw |
+| `get_doc_outline`  | List a repository's Markdown docs                    | GitHub tree API |
+| `discover_repo`    | Discover a recommended repository                    | GitHub search |
+| `get_trending`     | Trending repositories                                | GitHub search |
+| `get_repo_info`    | Repository information                               | GitHub repos API |
+| `read_source_file` | Read a source file's contents (optional line range)  | raw.githubusercontent |
 
-## Usage Without a Zread.ai Account
+## GitHub Token (optional)
 
-No account or token is needed for most features. Out of the box you can:
+Everything works anonymously on public repositories. The unauthenticated GitHub API allows ~60 requests/hour; reading file contents (`cat`, `read_doc`, `read_source_file`) goes through `raw.githubusercontent.com` and does not consume that quota.
 
-- **Browse docs** - `zread ls`, `zread cat`
-- **Search** - `zread find` (repositories and docs)
-- **Discover repos** - `zread top`, `zread rand`, `zread stat`
-- **Export docs** - `zread cp` (including `llms.txt` / `llms-full.txt`)
-
-The only feature that requires a token is AI Q&A: the `zread ai` CLI command and the `ask_ai` MCP tool. When the MCP server starts without `ZREAD_TOKEN`, the `ask_ai` tool is simply not registered and all other tools work as usual.
+Set a token to raise the API limit to 5,000 requests/hour and to read private repositories:
 
 ```bash
-# CLI, no token needed
-uvx zread ls golang/go
-uvx zread cat vuejs/vue
-uvx zread find ai sandbox
-
-# MCP server, no token needed
-uvx zread mcp
+export GITHUB_TOKEN=ghp_your_token   # or ZREAD_GITHUB_TOKEN
 ```
 
-Token-free MCP client configuration (`zread install <agent>` without `-t` produces the same):
-
-```json
-{
-  "mcpServers": {
-    "zread": {
-      "command": "uvx",
-      "args": ["zread", "mcp"]
-    }
-  }
-}
-```
-
-To enable AI Q&A later, get a free token as described below and add it via `ZREAD_TOKEN`.
-
-### Direct mode: no connection to zread.ai at all
-
-Everything above still talks to zread.ai (anonymously). If you don't want zread to contact zread.ai **at all**, use direct mode: all data then comes straight from GitHub (`api.github.com` + `raw.githubusercontent.com`).
-
-```bash
-# Per command
-zread ls golang/go --direct
-zread cat golang/go docs/README.md -d
-zread find golang/go goroutine -d          # greps the repo's markdown docs
-zread stat torvalds/linux -d
-zread cp vuejs/vue -d
-
-# Process-wide via environment variable
-export ZREAD_DIRECT=1
-
-# Or permanently in ~/.config/zread/zread.toml
-# [zread]
-# direct = true
-
-# MCP server in direct mode
-zread mcp --direct
-```
-
-What changes in direct mode:
-
-| Feature | zread.ai mode | Direct mode |
-| --- | --- | --- |
-| `ls` / doc outline | AI-generated wiki pages | the repository's own markdown files (README, `docs/`, …) |
-| `cat` / `read_doc` | AI wiki page content | raw file content from GitHub |
-| `find <repo> <query>` | wiki full-text search | keyword grep across the repo's markdown docs |
-| `find <query>` / `top` / `rand` / `stat` | zread.ai catalog | GitHub search / repos API |
-| `cp` export | wiki export + `llms.txt` | markdown docs export + `llms.txt` |
-| `zread ai` / `ask_ai` MCP tool | zread.ai LLM | **not available** (clear error; MCP doesn't register the tool) |
-
-Direct mode uses GitHub's public API anonymously (60 requests/hour). Set `GITHUB_TOKEN` (or `ZREAD_GITHUB_TOKEN` / `github_token` in the config file) to raise the limit and to read private repositories. Reading file contents (`cat`, `read_doc`, `read_source_file`) doesn't consume API quota at all.
-
-Token-free, zread.ai-free MCP client configuration:
-
-```json
-{
-  "mcpServers": {
-    "zread": {
-      "command": "uvx",
-      "args": ["zread", "mcp", "--direct"]
-    }
-  }
-}
-```
-
-Related: `ZREAD_BASE_URL` lets you point the non-direct mode at a self-hosted zread-compatible API instead of `https://zread.ai`.
-
-## Get a Token
-
-AI Q&A requires a free JWT token from your Zread.ai account:
-
-1. Visit https://zread.ai and sign in
-2. Press F12 to open the browser console
-3. Run:
-   ```javascript
-   prompt(
-     "copy token",
-     JSON.parse(localStorage.getItem("CGX_AUTH_STORAGE")).state.token,
-   );
-   ```
-4. Copy the token from the popup dialog
+A [fine-grained or classic PAT](https://github.com/settings/tokens) with read access is enough. The token is only ever sent to `api.github.com` (and to `raw.githubusercontent.com` on a 404 retry, for private repos) — never anywhere else.
 
 ## Environment Variables
 
-| Variable       | Description                                                        |
-| -------------- | ------------------------------------------------------------------ |
-| `ZREAD_TOKEN`  | Free JWT token from your zread.ai account, only required for AI Q&A |
-| `ZREAD_LANG`   | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
-| `ZREAD_MODEL`  | Default AI model (`glm-5.1` / `claude-sonnet-4.6`), lower priority than `--model` |
-| `ZREAD_DIRECT` | `1`/`true` enables direct mode: fetch everything from GitHub, never contact zread.ai |
-| `GITHUB_TOKEN` | Optional GitHub token for direct mode (higher API rate limits, private repos); `ZREAD_GITHUB_TOKEN` takes precedence |
-| `ZREAD_BASE_URL` | Base URL of a self-hosted zread-compatible API (default `https://zread.ai`) |
+| Variable              | Description                                                                 |
+| --------------------- | --------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`        | Optional GitHub token — higher API rate limits and private repos. `ZREAD_GITHUB_TOKEN` takes precedence. |
+| `ZREAD_LANG`          | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
 
 ## Configuration File
 
@@ -586,12 +368,8 @@ You can also configure zread using a config file. The priority is: **CLI argumen
 
 ```toml
 [zread]
-token = "your-token-here"
-lang = "zh"  # optional, defaults to "zh"
-model = "glm-5.1"  # optional, defaults to "glm-5.1", also supports "claude-sonnet-4.6"
-direct = false  # optional, true = direct mode (GitHub only, never contact zread.ai)
-github_token = ""  # optional, GitHub token for direct mode
-base_url = "https://zread.ai"  # optional, self-hosted zread-compatible API
+lang = "en"          # optional, defaults to "en"
+github_token = ""    # optional, GitHub token for higher limits / private repos
 ```
 
 ## Contributing

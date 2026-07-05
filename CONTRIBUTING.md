@@ -53,7 +53,7 @@ docker compose up -d   # 需要先配置 .env（见 .env.example）
 - 遵循 PEP 8 风格指南，保持代码简洁清晰
 - **所有面向用户的文本必须走 `tr()` 国际化**：同时更新 `messages.zh.yml` 和 `messages.en.yml`，不要在代码里硬编码文案
 - **文档双语同步**：改动 `README.md` 时请同步更新 `README.zh.md`（反之亦然）
-- 新增会访问网络的功能时，注意区分 zread.ai 模式和直连模式（`--direct`，数据仅来自 GitHub），两条路径都要能工作或给出明确报错
+- 所有数据都来自 GitHub（`api.github.com` + `raw.githubusercontent.com`），不引入任何外部 SaaS 依赖；GitHub 数据层集中在 `_github_*` 系列函数中
 - 提交前手动验证受影响的命令（如 `uv run zread ls golang/go -p`、`uv run zread mcp` 冒烟测试）
 
 ## 报告问题 / Reporting Issues

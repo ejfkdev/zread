@@ -1,202 +1,126 @@
 en:
   cli:
-    app_help: "Zread helps you and your AI understand code better. Skip the source dive and ask directly.\nhttps://github.com/valeriikot/zread"
-    env_vars_title: "Environment Variables"
-    env_var_token_desc: "JWT token from your zread.ai account login, only required for AI chat"
-    env_var_lang_desc: "Default language (zh/en), lower priority than --lang and higher than system locale"
-    env_var_model_desc: "Default AI model (glm-5.1/claude-sonnet-4.6), lower priority than --model"
-    env_var_direct_desc: "Direct mode (1/true): fetch data from GitHub only, never contact zread.ai"
-    env_var_github_token_desc: "Optional GitHub token for direct mode (higher rate limits, private repos)"
-    show_version: "Show version"
-    show_help: "Show help"
+    app_help: 'Zread helps you and your AI understand code better. Skip the source dive and ask directly.
+
+      https://github.com/valeriikot/zread'
+    env_vars_title: Environment Variables
+    env_var_lang_desc: Default language (zh/en), lower priority than --lang and higher than system locale
+    env_var_github_token_desc: Optional GitHub token for higher API rate limits and private repos
+    show_version: Show version
+    show_help: Show help
     commands:
-      mcp: "Start the MCP server"
-      ls: "Show the documentation outline"
-      cat: "Read repository content from zread docs pages or GitHub files"
-      find: "Search GitHub repositories, or search keywords inside a repository's docs"
-      top: "Show trending repositories"
-      rand: "Discover a recommended repository at random"
-      stat: "Show repository information"
-      ai: "Ask the repository AI a question (token required)"
-      cp: "Export repository docs locally and generate llms.txt / llms-full.txt"
-      install: "Configure the zread MCP server for an AI coding agent (Claude Code / Codex / Hermes)"
+      mcp: Start the MCP server
+      ls: Show the documentation outline
+      cat: Read a repository's docs or source files from GitHub
+      find: Search GitHub repositories, or search keywords inside a repository's docs
+      top: Show trending repositories
+      rand: Discover a recommended repository at random
+      stat: Show repository information
+      cp: Export repository docs locally and generate llms.txt / llms-full.txt
+      install: Configure the zread MCP server for an AI coding agent (Claude Code / Codex / Hermes)
     args:
-      transport: "Transport protocol: stdio / sse / http"
-      address: "Address formats: host, host:port, :port, host:port/path, :port/path (default: 127.0.0.1:8708)"
-      repo: "Repository path in owner/repo format"
-      repo_optional: "Repository path (optional, owner/repo)"
-      repo_or_url: "Repository path (owner/repo) or GitHub URL"
-      path_or_slug: "zread slug (for example 1-overview) or file path (for example README.md), default: 1-overview"
-      cat_extra: "Optional: file path, start line, or line range (for example 5, 5:20, Lib/http/client.py)"
-      query: "Search keyword"
-      weeks: "How many recent weeks of rankings to show"
-      topic_optional: "GitHub topic tag such as python, awesome-list, or agent-skills (optional)"
-      question_optional: "Question (optional, enters interactive mode when omitted)"
-      output_dir: "Output directory (default: current directory)"
-      agent: "Target agent: claude-code / codex / hermes"
+      transport: 'Transport protocol: stdio / sse / http'
+      address: 'Address formats: host, host:port, :port, host:port/path, :port/path (default: 127.0.0.1:8708)'
+      repo: Repository path in owner/repo format
+      repo_optional: Repository path (optional, owner/repo)
+      repo_or_url: Repository path (owner/repo) or GitHub URL
+      path_or_slug: 'Doc/file path (for example README.md, docs/guide.md); default: README'
+      cat_extra: 'Optional: file path, start line, or line range (for example 5, 5:20, Lib/http/client.py)'
+      query: Search keyword
+      weeks: How many recent weeks of rankings to show
+      topic_optional: GitHub topic tag such as python, awesome-list, or agent-skills (optional)
+      output_dir: 'Output directory (default: current directory)'
+      agent: 'Target agent: claude-code / codex / hermes'
     options:
-      token: "ZREAD_TOKEN"
-      lang: "Language: zh / en"
-      json: "Output as JSON"
-      plain: "Output plain text"
-      ai_plain: "Stream only the answer body"
-      ai_json: "Return reasoning and answer in one final JSON object"
-      model: "Model: glm-5.1 or claude-sonnet-4.6 (default glm-5.1, can be set via ZREAD_MODEL env var or config file)"
-      concurrency: "Concurrency (default: 10)"
-      print_only: "Print the configuration only, without modifying anything"
-      mcp_url: "URL of a shared zread MCP server (HTTP mode), e.g. http://zread.internal:8708/mcp — configures the agent to connect there instead of running a local process"
-      direct: "Direct mode: fetch everything from GitHub, never contact zread.ai (docs = the repository's own markdown files)"
+      lang: 'Language: zh / en'
+      json: Output as JSON
+      plain: Output plain text
+      concurrency: 'Concurrency (default: 10)'
+      print_only: Print the configuration only, without modifying anything
+      mcp_url: URL of a shared zread MCP server (HTTP mode), e.g. http://zread.internal:8708/mcp — the agent connects there instead of running a local process
   status:
-    fetch_outline: "Fetching documentation outline..."
-    fetch_page: "Fetching page content..."
-    locate_default_page: "Locating the default page..."
-    fetch_repo_info: "Fetching repository information..."
-    fetch_file_content: "Fetching file content..."
-    search_docs: "Searching documentation..."
-    search_repos: "Searching repositories..."
-    fetch_trending: "Fetching trending repositories..."
-    fetch_recommend: "Fetching recommended repositories..."
-    preparing: "Preparing..."
-    thinking: "Thinking..."
-    downloading_repo: "📥 Downloading %{repo}..."
+    fetch_outline: Fetching documentation outline...
+    fetch_page: Fetching page content...
+    locate_default_page: Locating the default page...
+    fetch_repo_info: Fetching repository information...
+    fetch_file_content: Fetching file content...
+    search_docs: Searching documentation...
+    search_repos: Searching repositories...
+    fetch_trending: Fetching trending repositories...
+    fetch_recommend: Fetching recommended repositories...
+    downloading_repo: 📥 Downloading %{repo}...
   errors:
-    missing_repo: "Missing required argument: REPO (repository path in owner/repo format)"
-    missing_repo_or_url: "Missing required argument: REPO_OR_URL (repository path or GitHub URL)"
-    missing_query: "Missing required argument: QUERY (search keyword)"
-    missing_agent: "Missing required argument: AGENT (claude-code / codex / hermes)"
-    fetch_outline: "Error: unable to fetch the documentation outline"
-    fetch_repo_outline: "Error: unable to fetch the repository outline"
-    fetch_page: "Error: unable to fetch the page content"
-    page_number_not_found: "Error: could not find page number %{number}"
-    page_missing_slug: "Error: page %{number} is missing a slug"
-    fetch_repo_metadata: "Error: unable to fetch repository metadata"
-    fetch_repo_info: "Error: unable to fetch repository information"
-    repo_not_found: "Error: unable to fetch repository information, repository not found"
-    fetch_repo_status: "Error: unable to fetch repository status"
-    search_failed: "Search failed"
-    fetch_trending: "Unable to fetch trending repositories"
-    fetch_recommend: "Unable to fetch recommended repositories"
-    ai_requires_token: |
-      Error: the ai command requires ZREAD_TOKEN
-
-      How to get your token (after logging in at https://zread.ai):
-      1. Press F12 to open the browser console
-      2. Run:
-         prompt("copy token", JSON.parse(localStorage.getItem("CGX_AUTH_STORAGE")).state.token)
-      3. Copy the token from the popup dialog
-
-      How to configure (choose one):
-      - Environment variable: export ZREAD_TOKEN='your-token-here'
-      - Config file: ~/.config/zread/zread.toml
-        [zread]
-        token = "your-token-here"
-
-      Or pass directly via command line: zread ai <repo> <question> -t your-token
-    create_talk: "Error: unable to create a conversation"
-    repo_not_indexed: "Error: this repository has not been indexed by zread yet. An indexing task was submitted in the background. Retry later or run `zread stat %{repo}` first."
-    repo_indexing: "Error: this repository is still indexing. Retry later or run `zread stat %{repo}` first."
-    repo_missing_docs: "Error: this repository has no usable documentation index for AI chat yet"
-    repo_ai_unavailable: "Error: AI chat is currently unavailable for this repository"
-    export_failed_with_reason: "❌ Export failed: %{error}"
-    error_prefix: "Error:"
-    http_request_failed: "HTTP request failed"
-    network_error_with_context: "%{context} - network error: %{error}"
-    json_parse_error_with_context: "%{context} - JSON parse error: %{error}"
-    parse_json_failed: "Failed to parse JSON: %{error}"
-    parse_data_structure_failed: "Failed to parse response structure: %{error}"
-    search_wiki_network_failed: "Wiki search request failed: %{error}"
-    search_wiki_parse_failed: "Failed to parse wiki search response: %{error}"
-    create_talk_failed_with_reason: "Failed to create conversation: %{detail}"
-    create_talk_network_failed: "Conversation creation request failed: %{error}"
-    create_talk_parse_failed: "Failed to parse conversation creation response: %{error}"
-    send_message_async_failed: "Failed to send message asynchronously: %{error}"
-    repo_has_no_pages: "Error: the repository has no pages"
-    recommend_failed_with_reason: "Repository recommendation failed: %{detail}"
-    recommend_network_failed: "Repository recommendation request failed: %{error}"
-    recommend_parse_failed: "Failed to parse recommendation response: %{error}"
-    search_repo_failed_with_reason: "Repository search failed: %{detail}"
-    search_repo_network_failed: "Repository search request failed: %{error}"
-    search_repo_parse_failed: "Failed to parse repository search response: %{error}"
-    invalid_repo_format: "Please use owner/repo format, for example: openclaw/openclaw"
-    get_repo_info_failed_with_reason: "Failed to fetch repository information: %{detail}"
-    get_repo_info_network_failed: "Repository info request failed: %{error}"
-    get_repo_info_parse_failed: "Failed to parse repository info response: %{error}"
-    submit_repo_failed_with_reason: "Failed to submit indexing request: %{detail}"
-    submit_repo_network_failed: "Index submission request failed: %{error}"
-    submit_repo_parse_failed: "Failed to parse index submission response: %{error}"
-    refresh_repo_network_failed: "Index refresh request failed: %{error}"
-    fetch_repo_info_for_file_failed: "Unable to fetch repository information: %{repo}"
-    repo_info_missing_repo_id: "Repository information is missing repo_id"
-    fetch_file_failed_with_reason: "Failed to fetch file: %{detail}"
-    file_not_found_or_inaccessible: "File does not exist or is inaccessible"
-    fetch_file_network_failed: "File content request failed: %{error}"
-    fetch_file_parse_failed: "Failed to parse file content response: %{error}"
-    fetch_file_data_parse_failed: "Failed to parse file content data: %{error}"
-    parse_repo_and_file_failed: "Error: unable to parse repository path and file path"
-    fetch_file_content: "Error: unable to fetch file content"
-    ai_session_create_failed: "❌ Failed to create AI session"
-    fetch_repo_info_retry: "❌ Unable to fetch repository information. Please try again later."
-    fetch_repo_outline_failed: "❌ Failed to fetch repository outline"
-    fetch_page_for_slug_failed: "❌ Unable to fetch page content: %{slug}"
-    fetch_recommend_repo_failed: "❌ Failed to fetch recommended repositories"
-    search_repo_failed: "❌ Repository search failed"
-    fetch_trending_repo_failed: "❌ Failed to fetch trending repositories"
-    fetch_repo_info_failed: "❌ Failed to fetch repository information"
-    fetch_file_failed_for_path: "❌ Unable to fetch file: %{path}"
-    github_request_failed: "GitHub request failed: %{error}"
-    github_rate_limited: "GitHub API rate limit reached. Set the GITHUB_TOKEN environment variable to raise the limit."
-    ai_direct_mode: "AI Q&A is provided by zread.ai and is not available in direct mode. Run without --direct / ZREAD_DIRECT to use it."
+    missing_repo: 'Missing required argument: REPO (repository path in owner/repo format)'
+    missing_repo_or_url: 'Missing required argument: REPO_OR_URL (repository path or GitHub URL)'
+    missing_query: 'Missing required argument: QUERY (search keyword)'
+    missing_agent: 'Missing required argument: AGENT (claude-code / codex / hermes)'
+    fetch_outline: 'Error: unable to fetch the documentation outline'
+    fetch_repo_outline: 'Error: unable to fetch the repository outline'
+    fetch_page: 'Error: unable to fetch the page content'
+    page_number_not_found: 'Error: could not find page number %{number}'
+    page_missing_slug: 'Error: page %{number} is missing a slug'
+    fetch_repo_info: 'Error: unable to fetch repository information'
+    repo_not_found: 'Error: unable to fetch repository information, repository not found'
+    search_failed: Search failed
+    fetch_trending: Unable to fetch trending repositories
+    fetch_recommend: Unable to fetch recommended repositories
+    export_failed_with_reason: '❌ Export failed: %{error}'
+    http_request_failed: HTTP request failed
+    invalid_repo_format: 'Please use owner/repo format, for example: openclaw/openclaw'
+    file_not_found_or_inaccessible: File does not exist or is inaccessible
+    parse_repo_and_file_failed: 'Error: unable to parse repository path and file path'
+    fetch_file_content: 'Error: unable to fetch file content'
+    fetch_repo_outline_failed: ❌ Failed to fetch repository outline
+    fetch_page_for_slug_failed: '❌ Unable to fetch page content: %{slug}'
+    fetch_recommend_repo_failed: ❌ Failed to fetch recommended repositories
+    search_repo_failed: ❌ Repository search failed
+    fetch_trending_repo_failed: ❌ Failed to fetch trending repositories
+    fetch_repo_info_failed: ❌ Failed to fetch repository information
+    fetch_file_failed_for_path: '❌ Unable to fetch file: %{path}'
+    github_request_failed: 'GitHub request failed: %{error}'
+    github_rate_limited: GitHub API rate limit reached. Set the GITHUB_TOKEN environment variable to raise the limit.
   messages:
-    no_results: "No results"
-    unknown_error: "Unknown error"
-    no_description: "No description"
-    no_pages: "(No pages yet)"
-    no_preview: "No preview available"
-    ai_mode_title: "AI chat mode"
-    ai_mode_hint: "Type a message and press Enter to send, or type exit to quit"
-    repo_label: "repo"
-    reasoning_title: "💭 Reasoning"
-    set_token_for_ai: "🔑 Set the ZREAD_TOKEN environment variable before using AI chat"
-    ai_no_valid_reply: "🤖 AI did not return a valid response"
-    file_info: "📄 %{file_path} | Total lines: %{total_lines} | Size: %{size}"
-    file_info_showing_lines: " | Showing: %{start}-%{end}"
-    exporting_repo: "📦 Exporting: %{repo}"
-    output_dir: "📁 Output directory: %{path}"
-    language_label: "🌐 Language: %{lang_code}"
-    concurrency_label: "⚡ Concurrency: %{concurrency}"
-    export_complete: "✅ Export complete!"
-    export_total: "   Total: %{count} pages"
-    export_success: "   Succeeded: %{count} pages"
-    export_failed: "   Failed: %{count} pages"
-    export_repo_dir: "📄 Docs directory: %{path}"
-    export_llms_file: "📄 llms.txt (index): %{path}"
-    export_llms_full_file: "📄 llms-full.txt (full content): %{path}"
-    export_failed_pages: "⚠️ Failed pages:"
-    direct_trending_title: "GitHub: most starred repos created this week"
+    no_results: No results
+    unknown_error: Unknown error
+    no_description: No description
+    no_pages: (No pages yet)
+    no_preview: No preview available
+    file_info: '📄 %{file_path} | Total lines: %{total_lines} | Size: %{size}'
+    file_info_showing_lines: ' | Showing: %{start}-%{end}'
+    exporting_repo: '📦 Exporting: %{repo}'
+    output_dir: '📁 Output directory: %{path}'
+    language_label: '🌐 Language: %{lang_code}'
+    concurrency_label: '⚡ Concurrency: %{concurrency}'
+    export_complete: ✅ Export complete!
+    export_total: '   Total: %{count} pages'
+    export_success: '   Succeeded: %{count} pages'
+    export_failed: '   Failed: %{count} pages'
+    export_repo_dir: '📄 Docs directory: %{path}'
+    export_llms_file: '📄 llms.txt (index): %{path}'
+    export_llms_full_file: '📄 llms-full.txt (full content): %{path}'
+    export_failed_pages: '⚠️ Failed pages:'
+    direct_trending_title: 'GitHub: most starred repos created this week'
   install:
-    unknown_agent: "Unknown agent: %{agent} (supported: %{supported})"
-    running: "Running: %{command}"
-    command_failed: "❌ Command failed (exit code %{code}). Configure it manually with `zread install <agent> --print`."
-    cli_not_found: "⚠️ `%{cli}` CLI not found, configure it manually:"
-    manual_run: "Run this command:"
-    manual_file: "Or add the following to %{path}:"
-    snippet_hint: "Add the following to %{path}:"
-    yaml_missing: "⚠️ PyYAML is not installed, add the configuration manually:"
-    config_parse_failed: "❌ Failed to parse %{path}: %{error}"
-    backup_saved: "📦 Existing config backed up to %{path}"
-    written: "📝 Config updated: %{path}"
-    success: "zread MCP server configured for %{agent}"
-    no_token_hint: "💡 No ZREAD_TOKEN configured: the ask_ai tool will be unavailable. Get a free token at https://zread.ai (see README), then rerun with -t your-token."
+    unknown_agent: 'Unknown agent: %{agent} (supported: %{supported})'
+    running: 'Running: %{command}'
+    command_failed: ❌ Command failed (exit code %{code}). Configure it manually with `zread install <agent> --print`.
+    cli_not_found: '⚠️ `%{cli}` CLI not found, configure it manually:'
+    manual_run: 'Run this command:'
+    manual_file: 'Or add the following to %{path}:'
+    snippet_hint: 'Add the following to %{path}:'
+    yaml_missing: '⚠️ PyYAML is not installed, add the configuration manually:'
+    config_parse_failed: '❌ Failed to parse %{path}: %{error}'
+    backup_saved: 📦 Existing config backed up to %{path}
+    written: '📝 Config updated: %{path}'
+    success: zread MCP server configured for %{agent}
   mcp:
-    direct_mode: "🔗 Direct mode: serving data straight from GitHub, zread.ai is not contacted. The ask_ai tool is unavailable."
-    token_enabled: "🔑 ZREAD_TOKEN is configured."
-    token_missing: "📝 ZREAD_TOKEN is not configured. To get one, sign in at https://zread.ai, open DevTools with F12, and run prompt('copy token', JSON.parse(localStorage.getItem('CGX_AUTH_STORAGE')).state.token)."
-    sse_started: "Starting SSE mode: %{url}"
-    http_started: "Starting HTTP mode: %{url}"
+    sse_started: 'Starting SSE mode: %{url}'
+    http_started: 'Starting HTTP mode: %{url}'
+    started: 🚀 zread MCP server ready — all tools backed by GitHub, no account needed.
   config:
-    title: "Config File"
-    macos: "macOS config file"
-    linux: "Linux config file"
-    windows: "Windows config file"
-    found: "Config file found: %{path}"
-    not_found: "Config file not found (optional)"
+    title: Config File
+    macos: macOS config file
+    linux: Linux config file
+    windows: Windows config file
+    found: 'Config file found: %{path}'
+    not_found: Config file not found (optional)

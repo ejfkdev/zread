@@ -19,14 +19,7 @@ services:
     ports:
       - "${ZREAD_MCP_PORT:-8708}:8708"
     environment:
-      # zread.ai account token: set it once here and the whole company
-      # gets the ask_ai tool without distributing the token to clients.
-      ZREAD_TOKEN: ${ZREAD_TOKEN:-}
-      # 1/true = direct mode: data comes from GitHub only, zread.ai is
-      # never contacted (ask_ai is disabled).
-      ZREAD_DIRECT: ${ZREAD_DIRECT:-0}
-      # Optional GitHub token for direct mode (rate limits, private repos).
+      # Optional GitHub token: raises GitHub API rate limits and enables
+      # private repositories. Everything works without it on public repos.
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       ZREAD_LANG: ${ZREAD_LANG:-en}
-      ZREAD_MODEL: ${ZREAD_MODEL:-glm-5.1}
-      ZREAD_BASE_URL: ${ZREAD_BASE_URL:-https://zread.ai}
