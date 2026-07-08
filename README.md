@@ -42,12 +42,15 @@ Read any GitHub repository's docs and source — from your terminal or from an A
 ## Features
 
 - 📖 **Read docs** — browse a repository's own Markdown docs (README, `docs/`, …) in the terminal
-- 🔍 **Search docs** — keyword search across a repository's Markdown files
+- 🔍 **Search docs & code** — keyword search across a repository's Markdown files, or its source code (`--code`, token required)
 - 🌟 **Discover repos** — trending and recommended repositories via GitHub search
-- 📄 **Read source files** — inspect any file's contents, optionally by line range
-- 📥 **Export docs** — export a repo's docs locally and generate `llms.txt` / `llms-full.txt` (CLI only)
+- 📄 **Read source files** — inspect any file's contents, by line range and at any branch / tag / commit (`@ref` / `--ref`)
+- 🌲 **Browse the file tree** — `zread tree` lists any repository's files, filtered by directory
+- 🏷️ **Releases** — `zread releases` shows recent releases with notes
+- 📥 **Export docs** — export a repo's docs (optionally with source files) and generate `llms.txt` / `llms-full.txt`
+- ⚡ **Quota-friendly** — on-disk ETag cache revalidates with `304`s that don't count against GitHub rate limits; `zread limits` shows your quota
 - 🔌 **MCP integration** — connect AI coding agents in one command (`zread install claude-code|codex|hermes`)
-- 🏢 **Docker deployment** — self-host one shared MCP server for your whole organization
+- 🏢 **Docker & GitHub Enterprise** — self-host one shared MCP server (`/healthz` included); point zread at a GHE instance via env vars
 
 ## Quick Start
 
@@ -109,16 +112,28 @@ zread mcp [stdio|http|sse] [address] [-l zh|en]
 zread ls <repo> [-l zh|en] [-j] [-p]
 
 # Read a doc or a source file
-zread cat <repo> [path] [-l zh|en] [-j] [-p]
+zread cat <repo> [path] [-r ref] [-l zh|en] [-j] [-p]
 #
 # Automatic argument detection:
 # - `zread cat owner/repo` reads the README
 # - `zread cat owner/repo docs/guide.md` reads that file
+# - `zread cat owner/repo@v1.2.0 README.md` pins a branch / tag / commit
 # - github.com/owner/repo/README.md#L1-10 and owner/repo/README.md#L1-10 also work
+# - github.com/owner/repo/blob/<ref>/file URLs keep their ref
 
 # Search
 zread find <query>                        # Search GitHub repositories
 zread find <repo> <query>                 # Search within a repository's docs
+zread find <repo> <query> --code          # Search source code (needs GITHUB_TOKEN)
+
+# List repository files (optionally under a directory)
+zread tree <repo> [path] [-r ref] [-n limit] [-j] [-p]
+
+# Show a repository's recent releases
+zread releases <repo> [-n limit] [-j] [-p]
+
+# Show GitHub API rate-limit status (the check itself is free)
+zread limits [-j] [-p]
 
 # Discover repositories
 zread rand [topic] [-l zh|en] [-j] [-p]
@@ -130,7 +145,12 @@ zread top [weeks] [-l zh|en] [-j] [-p]
 zread stat <repo> [-l zh|en] [-j] [-p]
 
 # Export a repo's docs locally and generate llms.txt / llms-full.txt
-zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
+zread cp <repo> [output_dir] [-r ref] [-c concurrency] \
+         [--include-source] [--front-matter] [--llms-only]
+
+# Read / write the config file (lang, github_token, github_api_url, github_raw_url)
+zread config set github_token ghp_xxx    # written with chmod 600
+zread config get [key] | unset <key> | path
 
 # Configure the zread MCP server for an AI coding agent
 # (local stdio by default; -u points the agent at a shared HTTP server)
@@ -146,6 +166,7 @@ The CLI supports plain text and JSON output and works well in pipelines:
 | `-l, --lang {zh,en}` | Language priority: `--lang` > `ZREAD_LANG` > system locale, default `en` |
 | `-j, --json`         | Output as JSON                                                         |
 | `-p, --plain`        | Output plain text                                                      |
+| `-r, --ref`          | Branch, tag, or commit (on `ls`/`cat`/`find`/`tree`/`cp`; default is the default branch) |
 | `-h, --help`         | Show help                                                              |
 | `-v, --version`      | Show version                                                           |
 
@@ -328,32 +349,46 @@ All tools are backed by GitHub and need no account or token:
 
 | Tool               | Description                                          | Backed by |
 | ------------------ | ---------------------------------------------------- | --------- |
-| `read_doc`         | Read a documentation page (a repo Markdown file)     | raw.githubusercontent |
+| `read_doc`         | Read a documentation page (a repo Markdown file); optional `ref` and `max_bytes` | raw.githubusercontent |
 | `search_wiki`      | Keyword-search a repository's Markdown docs          | GitHub tree + raw |
 | `get_doc_outline`  | List a repository's Markdown docs                    | GitHub tree API |
 | `discover_repo`    | Discover a recommended repository                    | GitHub search |
+| `search_repos`     | Search GitHub repositories by keyword                | GitHub search |
 | `get_trending`     | Trending repositories                                | GitHub search |
 | `get_repo_info`    | Repository information                               | GitHub repos API |
-| `read_source_file` | Read a source file's contents (optional line range)  | raw.githubusercontent |
+| `read_source_file` | Read a source file's contents (line range, `ref`, `max_bytes`) | raw.githubusercontent |
+| `list_repo_files`  | List repository files, optionally under a directory  | GitHub tree API |
+| `search_code`      | Search source code inside a repository (requires token) | GitHub code search |
+| `get_releases`     | Recent releases with (truncated) release notes       | GitHub releases API |
+| `get_rate_limit`   | Current API quota status (the check itself is free)  | GitHub rate-limit API |
+
+Long outputs on `read_doc` / `read_source_file` can be capped with `max_bytes` so huge files don't blow up an agent's context window.
 
 ## GitHub Token (optional)
 
 Everything works anonymously on public repositories. The unauthenticated GitHub API allows ~60 requests/hour; reading file contents (`cat`, `read_doc`, `read_source_file`) goes through `raw.githubusercontent.com` and does not consume that quota.
 
-Set a token to raise the API limit to 5,000 requests/hour and to read private repositories:
+zread also keeps an on-disk ETag cache (`~/.cache/zread`, `ZREAD_NO_CACHE=1` disables it): repeated requests are revalidated with `If-None-Match`, and GitHub does **not** count `304 Not Modified` responses against the quota — so browsing the same repos costs almost nothing. Check your current quota anytime with `zread limits`.
+
+Set a token to raise the API limit to 5,000 requests/hour, unlock code search, and read private repositories:
 
 ```bash
-export GITHUB_TOKEN=ghp_your_token   # or ZREAD_GITHUB_TOKEN
+export GITHUB_TOKEN=ghp_your_token       # or ZREAD_GITHUB_TOKEN
+# or store it in the config file (written with chmod 600):
+zread config set github_token ghp_your_token
 ```
 
 A [fine-grained or classic PAT](https://github.com/settings/tokens) with read access is enough. The token is only ever sent to `api.github.com` (and to `raw.githubusercontent.com` on a 404 retry, for private repos) — never anywhere else.
 
 ## Environment Variables
 
-| Variable              | Description                                                                 |
-| --------------------- | --------------------------------------------------------------------------- |
-| `GITHUB_TOKEN`        | Optional GitHub token — higher API rate limits and private repos. `ZREAD_GITHUB_TOKEN` takes precedence. |
-| `ZREAD_LANG`          | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
+| Variable               | Description                                                                 |
+| ---------------------- | --------------------------------------------------------------------------- |
+| `GITHUB_TOKEN`         | Optional GitHub token — higher API rate limits, code search, private repos. `ZREAD_GITHUB_TOKEN` takes precedence. |
+| `ZREAD_LANG`           | Default language (`zh` / `en`), lower priority than `--lang` and higher than system locale |
+| `ZREAD_GITHUB_API_URL` | GitHub API base URL override, e.g. `https://github.example.com/api/v3` (GitHub Enterprise) |
+| `ZREAD_GITHUB_RAW_URL` | GitHub raw-content base URL override, e.g. `https://github.example.com/raw` (GitHub Enterprise) |
+| `ZREAD_NO_CACHE`       | Set to `1` to disable the on-disk ETag response cache                        |
 
 ## Configuration File
 
@@ -368,9 +403,13 @@ You can also configure zread using a config file. The priority is: **CLI argumen
 
 ```toml
 [zread]
-lang = "en"          # optional, defaults to "en"
-github_token = ""    # optional, GitHub token for higher limits / private repos
+lang = "en"           # optional, defaults to "en"
+github_token = ""     # optional, GitHub token for higher limits / private repos
+github_api_url = ""   # optional, GitHub Enterprise API base URL
+github_raw_url = ""   # optional, GitHub Enterprise raw-content base URL
 ```
+
+Manage it from the CLI with `zread config get|set|unset|path` — `set` writes the file with `chmod 600` so a stored token isn't world-readable.
 
 ## Contributing
 

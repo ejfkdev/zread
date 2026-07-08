@@ -6,17 +6,28 @@ en:
     env_vars_title: Environment Variables
     env_var_lang_desc: Default language (zh/en), lower priority than --lang and higher than system locale
     env_var_github_token_desc: Optional GitHub token for higher API rate limits and private repos
+    env_var_api_url_desc: GitHub API base URL override (GitHub Enterprise)
+    env_var_raw_url_desc: GitHub raw-content base URL override (GitHub Enterprise)
+    env_var_no_cache_desc: Set to 1 to disable the on-disk ETag response cache
     show_version: Show version
     show_help: Show help
     commands:
       mcp: Start the MCP server
       ls: Show the documentation outline
       cat: Read a repository's docs or source files from GitHub
-      find: Search GitHub repositories, or search keywords inside a repository's docs
+      find: Search GitHub repositories, or search keywords inside a repository's docs or code
       top: Show trending repositories
       rand: Discover a recommended repository at random
       stat: Show repository information
+      tree: List repository files (optionally under a directory)
+      releases: Show a repository's recent releases
+      limits: Show GitHub API rate-limit status (the check itself is free)
       cp: Export repository docs locally and generate llms.txt / llms-full.txt
+      config: Read or write the zread config file (lang, github_token, ...)
+      config_path: Show the config file path
+      config_get: Read a config value (all values when no key is given)
+      config_set: Write a config value
+      config_unset: Remove a config value
       install: Configure the zread MCP server for an AI coding agent (Claude Code / Codex / Hermes)
     args:
       transport: 'Transport protocol: stdio / sse / http'
@@ -31,6 +42,9 @@ en:
       topic_optional: GitHub topic tag such as python, awesome-list, or agent-skills (optional)
       output_dir: 'Output directory (default: current directory)'
       agent: 'Target agent: claude-code / codex / hermes'
+      tree_path: Optional directory to filter by, e.g. src/net
+      config_key: 'Config key: lang / github_token / github_api_url / github_raw_url'
+      config_value: Value to store
     options:
       lang: 'Language: zh / en'
       json: Output as JSON
@@ -38,6 +52,12 @@ en:
       concurrency: 'Concurrency (default: 10)'
       print_only: Print the configuration only, without modifying anything
       mcp_url: URL of a shared zread MCP server (HTTP mode), e.g. http://zread.internal:8708/mcp — the agent connects there instead of running a local process
+      ref: Branch, tag, or commit (default is the repository's default branch)
+      code_search: Search source code instead of docs (requires GITHUB_TOKEN)
+      limit: Maximum number of entries to show
+      include_source: Also download source files (skips binaries and files over 512 KB, max 500 files)
+      front_matter: Prepend YAML front matter (path, repository, source URL) to exported docs
+      llms_only: Only generate llms.txt / llms-full.txt, do not keep per-page files
   status:
     fetch_outline: Fetching documentation outline...
     fetch_page: Fetching page content...
@@ -46,8 +66,12 @@ en:
     fetch_file_content: Fetching file content...
     search_docs: Searching documentation...
     search_repos: Searching repositories...
+    search_code: Searching code...
     fetch_trending: Fetching trending repositories...
     fetch_recommend: Fetching recommended repositories...
+    fetch_tree: Fetching repository file tree...
+    fetch_releases: Fetching releases...
+    fetch_limits: Fetching rate-limit status...
     downloading_repo: 📥 Downloading %{repo}...
   errors:
     missing_repo: 'Missing required argument: REPO (repository path in owner/repo format)'
@@ -69,6 +93,7 @@ en:
     invalid_repo_format: 'Please use owner/repo format, for example: openclaw/openclaw'
     file_not_found_or_inaccessible: File does not exist or is inaccessible
     parse_repo_and_file_failed: 'Error: unable to parse repository path and file path'
+    parse_repo_url_failed: 'Unable to parse repository path: %{input} (expected owner/repo or a GitHub URL)'
     fetch_file_content: 'Error: unable to fetch file content'
     fetch_repo_outline_failed: ❌ Failed to fetch repository outline
     fetch_page_for_slug_failed: '❌ Unable to fetch page content: %{slug}'
@@ -77,8 +102,17 @@ en:
     fetch_trending_repo_failed: ❌ Failed to fetch trending repositories
     fetch_repo_info_failed: ❌ Failed to fetch repository information
     fetch_file_failed_for_path: '❌ Unable to fetch file: %{path}'
+    fetch_tree_failed: ❌ Failed to fetch the repository file tree
+    fetch_releases_failed: ❌ Failed to fetch releases
+    fetch_rate_limit_failed: ❌ Failed to fetch the rate-limit status
     github_request_failed: 'GitHub request failed: %{error}'
     github_rate_limited: GitHub API rate limit reached. Set the GITHUB_TOKEN environment variable to raise the limit.
+    rate_limit_resets: Quota resets %{when}.
+    code_search_needs_token: GitHub code search requires authentication. Set GITHUB_TOKEN or run `zread config set github_token <token>`.
+    tree_truncated_warning: '⚠️ GitHub returned a truncated file tree for %{repo}; results may be incomplete.'
+    unknown_transport: 'Unknown transport: %{transport} (supported: stdio / sse / http)'
+    invalid_address: 'Invalid address: %{address}'
+    invalid_config_key: 'Unknown config key: %{name} (supported: %{supported})'
   messages:
     no_results: No results
     unknown_error: Unknown error
@@ -87,19 +121,30 @@ en:
     no_preview: No preview available
     file_info: '📄 %{file_path} | Total lines: %{total_lines} | Size: %{size}'
     file_info_showing_lines: ' | Showing: %{start}-%{end}'
+    truncated_output: '[... truncated: showing %{shown} of %{total} bytes]'
+    tree_summary: '%{shown} of %{total} files'
+    releases_none: No releases
     exporting_repo: '📦 Exporting: %{repo}'
     output_dir: '📁 Output directory: %{path}'
     language_label: '🌐 Language: %{lang_code}'
     concurrency_label: '⚡ Concurrency: %{concurrency}'
     export_complete: ✅ Export complete!
-    export_total: '   Total: %{count} pages'
+    export_total: '   Total: %{count} files'
     export_success: '   Succeeded: %{count} pages'
     export_failed: '   Failed: %{count} pages'
+    export_source_files: '   Source files: %{count}'
     export_repo_dir: '📄 Docs directory: %{path}'
     export_llms_file: '📄 llms.txt (index): %{path}'
     export_llms_full_file: '📄 llms-full.txt (full content): %{path}'
     export_failed_pages: '⚠️ Failed pages:'
     direct_trending_title: 'GitHub: most starred repos created this week'
+  limits:
+    resource: Resource
+    remaining: Remaining
+    limit: Limit
+    resets: Resets
+    token_active: GitHub token configured (authenticated limits)
+    token_missing: No GitHub token (anonymous limits — set GITHUB_TOKEN to raise them)
   install:
     unknown_agent: 'Unknown agent: %{agent} (supported: %{supported})'
     running: 'Running: %{command}'
@@ -124,3 +169,5 @@ en:
     windows: Windows config file
     found: 'Config file found: %{path}'
     not_found: Config file not found (optional)
+    set_ok: '✅ %{name} saved to %{path}'
+    unset_ok: '✅ %{name} removed from %{path}'

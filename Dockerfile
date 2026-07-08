@@ -53,10 +53,11 @@ ENV ZREAD_LANG=en
 
 EXPOSE 8708
 
-# The server is healthy as soon as it accepts TCP connections on the
-# MCP port (a failed connect raises and exits non-zero).
+# Health: prefer the /healthz endpoint (a real HTTP response from the MCP
+# app, including version and runtime metrics); fall back to a TCP connect
+# if the route is unavailable.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 CMD \
-    python -c "import socket; socket.create_connection(('127.0.0.1', 8708), timeout=4)"
+    python -c "exec(\"import urllib.request, socket\ntry:\n    urllib.request.urlopen('http://127.0.0.1:8708/healthz', timeout=4)\nexcept Exception:\n    socket.create_connection(('127.0.0.1', 8708), timeout=4)\")"
 
 ENTRYPOINT ["zread"]
 CMD ["mcp", "http", "0.0.0.0:8708"]

@@ -1,5 +1,7 @@
 # zread — Code Review & Feature Plan
 
+> **Status: implemented.** Every bug below (H1–H5, M1–M10, and the low-severity items) is fixed and all four phases of the feature plan are shipped in this branch: the monolith is split into `zread/{config,http,cache,github,render,tools,export,mcp_server,cli}.py`, with a pytest+respx suite under `tests/` and a lint+test CI workflow. Line numbers below refer to the pre-refactor single-file `zread/__init__.py` and are kept for the historical record.
+
 _Review of `zread/__init__.py` (4,250 lines), Docker/compose assets, CI workflow, and locales as of `b4a218a` (post-standalone refactor). Line numbers refer to `zread/__init__.py`._
 
 ---
