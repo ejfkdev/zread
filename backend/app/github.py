@@ -112,21 +112,46 @@ def _doc_rank(f: Dict[str, Any]) -> Tuple[int, str]:
 async def fetch_raw(
     client: httpx.AsyncClient, owner: str, repo: str, ref: str, path: str
 ) -> Optional[str]:
-    """Download a single file's raw text. Public repos work anonymously;
-    a 404 triggers a token-authenticated retry (private repos)."""
+    """Download a single file's raw text.
+
+    Public repos work anonymously; a 404 triggers a token-authenticated retry
+    (private repos). Retries on 429/503 with exponential backoff (respects
+    Retry-After) so a large monorepo doesn't die on GitHub's rate limit.
+    """
     url = f"{settings.github_raw_url}/{owner}/{repo}/{ref}/{path}"
     base_headers = {"User-Agent": "zread-ai-backend"}
-    resp = await client.get(url, headers=base_headers, timeout=_RAW_TIMEOUT)
-    if resp.status_code == 404 and settings.github_token:
-        resp = await client.get(
-            url,
-            headers={**base_headers, "Authorization": f"Bearer {settings.github_token}"},
-            timeout=_RAW_TIMEOUT,
-        )
-    if resp.status_code == 404:
-        return None
+
+    for attempt in range(4):
+        resp = await client.get(url, headers=base_headers, timeout=_RAW_TIMEOUT)
+        if resp.status_code == 404 and settings.github_token:
+            resp = await client.get(
+                url,
+                headers={**base_headers, "Authorization": f"Bearer {settings.github_token}"},
+                timeout=_RAW_TIMEOUT,
+            )
+        if resp.status_code == 404:
+            return None
+        if resp.status_code in (429, 503):
+            delay = _retry_after(resp, attempt)
+            _log.warning("fetch_raw %s got %d, retrying in %.1fs", path, resp.status_code, delay)
+            await asyncio.sleep(delay)
+            continue
+        resp.raise_for_status()
+        return resp.text
+    # Exhausted retries — raise so the caller logs it, but don't crash the batch.
     resp.raise_for_status()
-    return resp.text
+    return None
+
+
+def _retry_after(resp: httpx.Response, attempt: int) -> float:
+    """Compute a backoff delay; honors Retry-After, capped at 30s."""
+    ra = resp.headers.get("retry-after", "")
+    if ra:
+        try:
+            return min(float(ra), 30.0)
+        except ValueError:
+            pass
+    return min(2.0 * (2 ** attempt), 30.0)
 
 
 async def fetch_files_concurrent(

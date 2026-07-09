@@ -85,10 +85,10 @@ async def index_repo(owner: str, repo: str, ref: str = "") -> None:
             _log.info("Indexed %s: %d files, %d chunks", repo_id, len(downloaded), len(all_chunks))
         except (GitHubError, httpx.HTTPError) as exc:
             _log.exception("Indexing failed for %s/%s", owner, repo)
-            _mark_error(db, owner, repo, ref, str(exc))
+            _mark_error(db, owner, repo, str(exc))
         except Exception as exc:  # noqa: BLE001 — never crash the task worker
             _log.exception("Unexpected indexing error for %s/%s", owner, repo)
-            _mark_error(db, owner, repo, ref, str(exc))
+            _mark_error(db, owner, repo, str(exc))
 
 
 def _replace_chunks(
@@ -126,11 +126,27 @@ def _replace_chunks(
         db.commit()
 
 
-def _mark_error(db, owner: str, repo: str, ref: str, message: str) -> None:
-    """Record an indexing failure so the status endpoint can report it."""
-    rid = _repo_id(owner, repo, ref or "")
+def _mark_error(db, owner: str, repo: str, message: str) -> None:
+    """Record an indexing failure so the status endpoint can report it.
+
+    Updates ALL rows for this owner/repo (the index endpoint may have inserted
+    an unresolved "@default" placeholder row before the ref was resolved) so a
+    status check always reflects the failure regardless of which repo_id was
+    queried.
+    """
+    now = time.time()
     db.execute(
-        "UPDATE repos SET status='error', error=?, indexed_at=? WHERE repo_id=?",
-        (message[:500], time.time(), rid),
+        "UPDATE repos SET status='error', error=?, indexed_at=? "
+        "WHERE owner=? AND repo=?",
+        (message[:500], now, owner, repo),
     )
+    # If no row was touched (e.g. default-branch resolution failed before any
+    # INSERT), insert one so the status endpoint can still return the error.
+    if db.total_changes == 0:
+        rid = f"{owner}/{repo}@error"
+        db.execute(
+            "INSERT OR IGNORE INTO repos(repo_id, owner, repo, ref, status, error, indexed_at) "
+            "VALUES(?,?,?,?, 'error', ?, ?)",
+            (rid, owner, repo, "", message[:500], now),
+        )
     db.commit()
