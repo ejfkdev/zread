@@ -43,10 +43,30 @@ docker compose up -d   # 需要先配置 .env（见 .env.example）
 
 ## 项目结构 / Project Layout
 
-- `zread/__init__.py` — 整个 CLI 和 MCP 服务都在这一个文件里，带有 PEP 723 内联脚本元数据（可直接 `uv run zread/__init__.py`）
+- `zread/__init__.py` — 包入口，重新导出公共 API
+- `zread/config.py` — 配置、语言 / i18n、GitHub 端点与 token
+- `zread/http.py` — httpx 包装（超时 / 重定向 / 指数退避重试）
+- `zread/cache.py` — 进程内 TTL 缓存 + 磁盘 ETag 缓存
+- `zread/github.py` — GitHub 数据层（API + raw 文件，`_github_*` 系列函数）
+- `zread/render.py` — Rich / 纯文本渲染
+- `zread/tools.py` — MCP 工具函数（docstring 即工具描述）
+- `zread/export.py` — 文档导出（llms.txt / llms-full.txt）
+- `zread/mcp_server.py` — MCP 服务注册与运行
+- `zread/cli.py` — Typer CLI
 - `zread/locales/messages.zh.yml` / `messages.en.yml` — 所有面向用户的文案（i18n）
+- `tests/` — pytest + respx 测试（不发真实网络请求）
 - `Dockerfile` / `docker-compose.yml` / `.env.example` — 公司级共享 MCP 服务部署
 - `scripts/` — 发布辅助脚本
+
+## 测试 / Testing
+
+```bash
+pip install -e ".[dev]"
+ruff check zread tests
+pytest
+```
+
+CI 会在 Python 3.10–3.13 上运行 lint 与全部测试；提交 PR 前请先在本地跑通。
 
 ## 代码规范 / Conventions
 

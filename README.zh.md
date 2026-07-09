@@ -42,12 +42,15 @@
 ## 功能
 
 - 📖 **阅读文档** —— 在终端浏览仓库自带的 Markdown 文档（README、`docs/` 等）
-- 🔍 **搜索文档** —— 在仓库的 Markdown 文件中关键词搜索
+- 🔍 **搜索文档与代码** —— 在仓库的 Markdown 文件中关键词搜索，或搜索源码（`--code`，需 token）
 - 🌟 **发现仓库** —— 通过 GitHub 搜索获取热门与推荐仓库
-- 📄 **查看源码** —— 读取任意文件内容，支持行号范围
-- 📥 **导出文档** —— 将仓库文档导出到本地，生成 `llms.txt` / `llms-full.txt`（CLI 专属）
+- 📄 **查看源码** —— 读取任意文件内容，支持行号范围与任意分支 / tag / commit（`@ref` / `--ref`）
+- 🌲 **浏览文件树** —— `zread tree` 列出仓库文件，可按目录过滤
+- 🏷️ **Releases** —— `zread releases` 查看最近的发布记录与说明
+- 📥 **导出文档** —— 将仓库文档（可含源码）导出到本地，生成 `llms.txt` / `llms-full.txt`
+- ⚡ **配额友好** —— 磁盘 ETag 缓存以 `304` 复验，不消耗 GitHub 限额；`zread limits` 查看配额
 - 🔌 **MCP 集成** —— 一条命令接入 AI 编码智能体（`zread install claude-code|codex|hermes`）
-- 🏢 **Docker 部署** —— 为整个组织自托管一个共享 MCP 服务
+- 🏢 **Docker 与 GitHub Enterprise** —— 自托管共享 MCP 服务（内置 `/healthz`）；通过环境变量指向 GHE 实例
 
 ## 快速启动
 
@@ -109,7 +112,7 @@ zread mcp [stdio|http|sse] [address] [-l zh|en]
 zread ls <repo> [-l zh|en] [-j] [-p]
 
 # 读取文档或源代码文件
-zread cat <repo> [path] [-l zh|en] [-j] [-p]
+zread cat <repo> [path] [-r ref] [-l zh|en] [-j] [-p]
 #
 # 自动识别参数：
 # - `zread cat owner/repo` 读取 README
@@ -119,6 +122,16 @@ zread cat <repo> [path] [-l zh|en] [-j] [-p]
 # 搜索
 zread find <query>                        # 搜索 GitHub 仓库
 zread find <repo> <query>                 # 在仓库文档内搜索
+zread find <repo> <query> --code          # 在仓库源码内搜索（需 GITHUB_TOKEN）
+
+# 列出仓库文件（可按目录过滤）
+zread tree <repo> [path] [-r ref] [-n limit] [-j] [-p]
+
+# 查看仓库最近的 Releases
+zread releases <repo> [-n limit] [-j] [-p]
+
+# 显示 GitHub API 配额状态（查询本身不消耗配额）
+zread limits [-j] [-p]
 
 # 发现仓库
 zread rand [topic] [-l zh|en] [-j] [-p]
@@ -130,7 +143,12 @@ zread top [weeks] [-l zh|en] [-j] [-p]
 zread stat <repo> [-l zh|en] [-j] [-p]
 
 # 导出仓库文档到本地，并生成 llms.txt / llms-full.txt
-zread cp <repo> [output_dir] [-l zh|en] [-c concurrency]
+zread cp <repo> [output_dir] [-r ref] [-c concurrency] \
+         [--include-source] [--front-matter] [--llms-only]
+
+# 读写配置文件（lang、github_token、github_api_url、github_raw_url）
+zread config set github_token ghp_xxx    # 以 chmod 600 写入
+zread config get [key] | unset <key> | path
 
 # 为 AI 编码智能体配置 zread MCP 服务
 # （默认本地 stdio；-u 可指向共享 HTTP 服务）
@@ -146,6 +164,7 @@ zread install <claude-code|codex|hermes> [-u url] [-p]
 | `-l, --lang {zh,en}` | 语言（优先级：`--lang` > `ZREAD_LANG` > 系统locale，默认 `en`） |
 | `-j, --json`         | JSON 格式输出                                                  |
 | `-p, --plain`        | 纯文本输出                                                     |
+| `-r, --ref`          | 分支 / tag / commit（`ls`/`cat`/`find`/`tree`/`cp` 支持；默认为默认分支） |
 | `-h, --help`         | 显示帮助                                                       |
 | `-v, --version`      | 显示版本                                                       |
 
@@ -334,16 +353,27 @@ docker run --rm zread-mcp top -p
 | `discover_repo`    | 随机发现推荐仓库                              | GitHub 搜索 |
 | `get_trending`     | 热门仓库榜单                                  | GitHub 搜索 |
 | `get_repo_info`    | 仓库信息                                      | GitHub repos API |
-| `read_source_file` | 读取源代码文件内容（可指定行号范围）          | raw.githubusercontent |
+| `read_source_file` | 读取源代码文件内容（行号范围、`ref`、`max_bytes`） | raw.githubusercontent |
+| `search_repos`     | 按关键词搜索 GitHub 仓库                      | GitHub 搜索 |
+| `list_repo_files`  | 列出仓库文件（可按目录过滤）                  | GitHub tree API |
+| `search_code`      | 在仓库源码内搜索（需要 token）                | GitHub 代码搜索 |
+| `get_releases`     | 最近的 Releases 与（截断的）发布说明          | GitHub releases API |
+| `get_rate_limit`   | 当前 API 配额状态（查询本身不消耗配额）       | GitHub rate-limit API |
+
+`read_doc` / `read_source_file` 支持 `max_bytes` 截断，避免超大文件撑爆智能体的上下文窗口。
 
 ## GitHub Token（可选）
 
 在公开仓库上一切都可匿名使用。未认证的 GitHub API 限额约为每小时 60 次；读取文件内容（`cat`、`read_doc`、`read_source_file`）走 `raw.githubusercontent.com`，不消耗该配额。
 
-配置 token 可将 API 限额提升到每小时 5000 次，并读取私有仓库：
+zread 还内置磁盘 ETag 缓存（`~/.cache/zread`，`ZREAD_NO_CACHE=1` 可禁用）：重复请求通过 `If-None-Match` 复验，GitHub **不会**把 `304 Not Modified` 计入配额——反复浏览相同仓库几乎不花配额。随时用 `zread limits` 查看当前配额。
+
+配置 token 可将 API 限额提升到每小时 5000 次、解锁代码搜索，并读取私有仓库：
 
 ```bash
-export GITHUB_TOKEN=ghp_your_token   # 或 ZREAD_GITHUB_TOKEN
+export GITHUB_TOKEN=ghp_your_token       # 或 ZREAD_GITHUB_TOKEN
+# 或写入配置文件（以 chmod 600 落盘）：
+zread config set github_token ghp_your_token
 ```
 
 一个具备读取权限的 [细粒度或经典 PAT](https://github.com/settings/tokens) 即可。该 token 只会发送到 `api.github.com`（以及私有仓库 404 重试时的 `raw.githubusercontent.com`），不会发往任何其他地方。
@@ -352,8 +382,11 @@ export GITHUB_TOKEN=ghp_your_token   # 或 ZREAD_GITHUB_TOKEN
 
 | 变量                  | 说明                                                                       |
 | --------------------- | -------------------------------------------------------------------------- |
-| `GITHUB_TOKEN`        | 可选的 GitHub token —— 提升 API 限额、访问私有仓库。`ZREAD_GITHUB_TOKEN` 优先级更高。 |
-| `ZREAD_LANG`          | 默认语言（`zh` / `en`），优先级低于 `--lang`、高于系统 locale               |
+| `GITHUB_TOKEN`         | 可选的 GitHub token —— 提升 API 限额、代码搜索、访问私有仓库。`ZREAD_GITHUB_TOKEN` 优先级更高。 |
+| `ZREAD_LANG`           | 默认语言（`zh` / `en`），优先级低于 `--lang`、高于系统 locale               |
+| `ZREAD_GITHUB_API_URL` | 覆盖 GitHub API 地址，如 `https://github.example.com/api/v3`（GitHub Enterprise） |
+| `ZREAD_GITHUB_RAW_URL` | 覆盖 GitHub raw 文件地址，如 `https://github.example.com/raw`（GitHub Enterprise） |
+| `ZREAD_NO_CACHE`       | 设为 `1` 可禁用磁盘 ETag 响应缓存                                           |
 
 ## 配置文件
 
@@ -368,9 +401,13 @@ export GITHUB_TOKEN=ghp_your_token   # 或 ZREAD_GITHUB_TOKEN
 
 ```toml
 [zread]
-lang = "en"          # 可选，默认 "en"
-github_token = ""    # 可选，用于提升限额 / 访问私有仓库的 GitHub token
+lang = "en"           # 可选，默认 "en"
+github_token = ""     # 可选，用于提升限额 / 访问私有仓库的 GitHub token
+github_api_url = ""   # 可选，GitHub Enterprise API 地址
+github_raw_url = ""   # 可选，GitHub Enterprise raw 文件地址
 ```
+
+也可以用 `zread config get|set|unset|path` 从命令行管理——`set` 以 `chmod 600` 写入，避免 token 全局可读。
 
 ## 贡献
 

@@ -109,6 +109,7 @@ en:
     github_rate_limited: GitHub API rate limit reached. Set the GITHUB_TOKEN environment variable to raise the limit.
     rate_limit_resets: Quota resets %{when}.
     code_search_needs_token: GitHub code search requires authentication. Set GITHUB_TOKEN or run `zread config set github_token <token>`.
+    code_search_needs_repo: '--code searches inside one repository — use: find <owner/repo> <query> --code'
     tree_truncated_warning: '⚠️ GitHub returned a truncated file tree for %{repo}; results may be incomplete.'
     unknown_transport: 'Unknown transport: %{transport} (supported: stdio / sse / http)'
     invalid_address: 'Invalid address: %{address}'

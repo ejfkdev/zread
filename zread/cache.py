@@ -81,6 +81,10 @@ class HTTPDiskCache:
         except Exception:
             return None
 
+    # 每个两位十六进制分片目录允许的最大条目数（约束整体磁盘占用：
+    # 256 个分片 × 64 条 ≈ 1.6 万条上限，超出时按 mtime 淘汰最旧的）
+    _SHARD_LIMIT = 64
+
     def store(self, key: str, etag: str, body: str) -> None:
         try:
             path = self._path(key)
@@ -94,6 +98,19 @@ class HTTPDiskCache:
                 encoding="utf-8",
             )
             os.replace(tmp, path)
+            self._prune_shard(path.parent)
+        except Exception:
+            pass
+
+    def _prune_shard(self, shard_dir: Path) -> None:
+        """分片目录超限时删除最旧的条目，保证磁盘缓存不会无限增长。"""
+        try:
+            entries = [p for p in shard_dir.iterdir() if p.suffix == ".json"]
+            if len(entries) <= self._SHARD_LIMIT:
+                return
+            entries.sort(key=lambda p: p.stat().st_mtime)
+            for stale in entries[: len(entries) - self._SHARD_LIMIT]:
+                stale.unlink(missing_ok=True)
         except Exception:
             pass
 

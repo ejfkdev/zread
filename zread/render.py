@@ -423,7 +423,9 @@ def _format_status_plain(item: Dict, lang: str) -> str:
 
 
 # --- Outline 格式化 ---
-def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
+def _format_outline_plain(
+    data: Dict, owner: str, repo_name: str, ref: Optional[str] = None
+) -> str:
     """纯文本格式输出大纲"""
     lines = []
     pages = data.get("pages", [])
@@ -447,7 +449,7 @@ def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
         if section not in groups:
             groups[section] = {}
 
-        full_url = _page_url(owner, repo_name, slug)
+        full_url = _page_url(owner, repo_name, slug, ref)
 
         if group:
             if group not in groups[section]:
@@ -484,7 +486,9 @@ def _extract_slug_number(slug: str) -> str:
     return match.group(1) if match else ""
 
 
-def _format_outline_rich(data: Dict, owner: str, repo_name: str) -> None:
+def _format_outline_rich(
+    data: Dict, owner: str, repo_name: str, ref: Optional[str] = None
+) -> None:
     """Rich 格式输出大纲（使用 Tree 组件）"""
     pages = data.get("pages", [])
     if not pages:
@@ -506,7 +510,7 @@ def _format_outline_rich(data: Dict, owner: str, repo_name: str) -> None:
         group = page.get("group", "")
         topic = page.get("topic", "")
         display_title = topic or title
-        full_url = _page_url(owner, repo_name, slug)
+        full_url = _page_url(owner, repo_name, slug, ref)
 
         if section not in sections:
             sections[section] = {}
@@ -587,7 +591,9 @@ def _clean_and_extract_em(text: str) -> "tuple[str, list[tuple[int, int]]]":
     return cleaned_no_em, em_positions
 
 
-def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
+def _format_search_results_rich(
+    results: List[Dict], repo: str = "", ref: Optional[str] = None
+) -> None:
     """Rich 格式输出文档搜索结果 (CLI 模式，保留 <em> 并高亮)"""
     console = Console()
 
@@ -597,10 +603,19 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
         slug_num = _extract_slug_number(slug)
         prefix = f"{slug_num}. " if slug_num else ""
         if repo and "/" in repo:
-            owner_part, name_part = repo.split("/", 1)
-            page_url = _page_url(owner_part, name_part, slug)
+            # 通过 parse_repo_url 归一化，owner/repo@ref 形式也能生成正确链接
+            try:
+                parsed_repo = parse_repo_url(repo)
+                page_url = _page_url(
+                    parsed_repo["owner"],
+                    parsed_repo["repo"],
+                    slug,
+                    ref or parsed_repo.get("ref"),
+                )
+            except ValueError:
+                page_url = f"https://github.com/{repo}/blob/{ref or 'HEAD'}/{slug}"
         else:
-            page_url = f"https://github.com/{repo}/blob/HEAD/{slug}"
+            page_url = f"https://github.com/{repo}/blob/{ref or 'HEAD'}/{slug}"
 
         contents = []
         for match in result.get("matches", []):

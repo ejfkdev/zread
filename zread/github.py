@@ -342,7 +342,9 @@ def _gh_repo_get(owner: str, repo: str, lang: str = "zh") -> Optional[Dict[str, 
     if cached is not MISSING:
         return cached
     value = _gh_api_get(f"/repos/{owner}/{repo}", lang=lang)
-    _GH_REPO_CACHE.set(key, value)
+    # 失败（404 或网络错误）不缓存：瞬时故障不应污染后续 15 分钟的请求
+    if value is not None:
+        _GH_REPO_CACHE.set(key, value)
     return value
 
 
@@ -373,7 +375,6 @@ def _gh_full_tree(
     if not tree_ref:
         info = _gh_repo_get(owner, repo, lang)
         if not info:
-            _GH_TREE_CACHE.set(key, None)
             return None
         tree_ref = info.get("default_branch") or "HEAD"
 
@@ -383,7 +384,7 @@ def _gh_full_tree(
         lang=lang,
     )
     if not data:
-        _GH_TREE_CACHE.set(key, None)
+        # 失败不缓存，避免瞬时故障被负缓存 15 分钟
         return None
 
     files = [

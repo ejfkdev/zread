@@ -109,6 +109,7 @@ zh:
     github_rate_limited: GitHub API 速率限制已用尽，可设置 GITHUB_TOKEN 环境变量提升限额。
     rate_limit_resets: 限额将于%{when}重置。
     code_search_needs_token: GitHub 代码搜索需要认证：请设置 GITHUB_TOKEN，或执行 `zread config set github_token <token>`。
+    code_search_needs_repo: --code 只在单个仓库内搜索——用法：find <owner/repo> <query> --code
     tree_truncated_warning: ⚠️ GitHub 返回的 %{repo} 文件树被截断，结果可能不完整。
     unknown_transport: 未知的传输协议：%{transport}（支持：stdio / sse / http）
     invalid_address: 无效的地址：%{address}
