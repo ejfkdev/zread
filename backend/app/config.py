@@ -1,19 +1,25 @@
 # -*- coding: utf-8 -*-
-"""Settings via pydantic-settings (env > .env file > defaults)."""
+"""Settings via pydantic-settings (env > .env file > defaults).
+
+All fields are read from ``ZREAD_*`` environment variables (or a ``.env``
+file). A handful of conventional unprefixed names (``GITHUB_TOKEN``,
+``BACKEND_API_KEY``) are accepted as aliases for convenience.
+"""
 
 from pathlib import Path
 from typing import List
 
-from pydantic import field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """All runtime configuration. Override any field via an env var of the
-    same (upper-cased) name, or via a ``.env`` file next to the backend.
+    """All runtime configuration. Override any field via a ZREAD_* env var
+    (or a ``.env`` file next to the backend).
     """
 
     model_config = SettingsConfigDict(
+        env_prefix="ZREAD_",  # all fields read from ZREAD_* env vars / .env
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
@@ -25,10 +31,16 @@ class Settings(BaseSettings):
     cors_origins: List[str] = ["*"]
     # Shared secret required on every /api/v1 request (Authorization: Bearer).
     # When unset the API is open — log a warning so operators notice.
-    backend_api_key: str = ""
+    # Accepts ZREAD_BACKEND_API_KEY or the unprefixed BACKEND_API_KEY.
+    backend_api_key: str = Field(
+        "", validation_alias=AliasChoices("ZREAD_BACKEND_API_KEY", "BACKEND_API_KEY")
+    )
 
     # --- GitHub (the backend fetches repos itself) ----------------------
-    github_token: str = ""
+    # Accepts ZREAD_GITHUB_TOKEN or the conventional GITHUB_TOKEN.
+    github_token: str = Field(
+        "", validation_alias=AliasChoices("ZREAD_GITHUB_TOKEN", "GITHUB_TOKEN")
+    )
     github_api_url: str = "https://api.github.com"
     github_raw_url: str = "https://raw.githubusercontent.com"
 
