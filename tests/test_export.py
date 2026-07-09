@@ -148,3 +148,39 @@ def test_export_include_source_skips_binaries_and_docs(tmp_path):
     assert result["source_files"] == 1
     assert not (repo_dir / "logo.png").exists()
     assert not (repo_dir / "big.py").exists()
+
+
+@respx.mock
+def test_export_rejects_path_traversal_slugs(tmp_path):
+    _mock_repo_api()
+    _mock_raw_pages()
+    evil_pages = [
+        {
+            "slug": "README.md",
+            "title": "README.md",
+            "topic": "README.md",
+            "group": "",
+            "section": "",
+        },
+        {
+            "slug": "../../ESCAPED.md",
+            "title": "evil",
+            "topic": "evil",
+            "group": "",
+            "section": "",
+        },
+    ]
+    respx.get(f"{RAW}/o/r/HEAD/../../ESCAPED.md").mock(
+        return_value=httpx.Response(200, text="pwn")
+    )
+
+    out_dir = tmp_path / "nested" / "out"
+    out_dir.mkdir(parents=True)
+    result = asyncio.run(
+        _export_repo_async("o/r", out_dir, "en", 2, pages=evil_pages)
+    )
+    # 恶意 slug 记为失败，不写出 output 目录之外
+    assert result["failed"] == 1
+    assert not (tmp_path / "ESCAPED.md").exists()
+    assert not (tmp_path / "nested" / "ESCAPED.md").exists()
+    assert (result["repo_dir"] / "README.md").exists()
