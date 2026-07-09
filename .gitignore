@@ -423,3 +423,8 @@ __pycache__
 
 # setuptools-scm generated version file
 zread_version.py
+
+# zread-ai backend: SQLite DB + vector store + venv
+backend/data/
+backend/.venv/
+

@@ -58,6 +58,16 @@ def _register_tools(mcp: Any) -> None:
     mcp.tool()(get_releases)
     mcp.tool()(get_rate_limit)
 
+    # AI Q&A 工具：仅在配置了 RAG 后端时动态注册（graceful degradation，
+    # 与 github_token 门控模式一致 —— 未配置则完全不暴露，不影响现有行为）
+    from zread.config import ai_backend_url
+
+    if ai_backend_url():
+        from zread.tools import ask, chat
+
+        mcp.tool()(ask)
+        mcp.tool()(chat)
+
 
 def _register_resources(mcp: Any) -> None:
     """注册 MCP 资源"""

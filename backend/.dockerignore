@@ -1,0 +1,10 @@
+.venv
+__pycache__
+*.egg-info
+data
+*.db
+*.db-wal
+*.db-shm
+.env
+tests
+.git

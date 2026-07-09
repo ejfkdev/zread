@@ -20,6 +20,9 @@ from zread.config import (
     APP_NAME,
     APP_VERSION,
     USER_AGENT,
+    ai_api_key,
+    ai_backend_url,
+    ai_llm_model,
     default_lang,
     github_api_url,
     github_raw_url,
@@ -40,6 +43,8 @@ from zread.github import (
 )
 from zread.tools import (
     analyze_project,
+    ask,
+    chat,
     compare_projects,
     discover_repo,
     documentation_catalog_resource,
@@ -71,6 +76,9 @@ __all__ = [
     "github_api_url",
     "github_raw_url",
     "github_token",
+    "ai_backend_url",
+    "ai_api_key",
+    "ai_llm_model",
     "tr",
     # 数据层公共 API
     "parse_repo_url",
@@ -101,6 +109,9 @@ __all__ = [
     "analyze_project",
     "compare_projects",
     "learn_project",
+    # AI Q&A (self-hosted RAG)
+    "ask",
+    "chat",
     # 入口
     "cli_app",
     "main",

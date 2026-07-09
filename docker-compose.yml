@@ -1,14 +1,15 @@
-# Company-wide zread MCP service.
+# Company-wide zread MCP + AI Q&A service.
 #
 # Configure once in .env (see .env.example), then:
 #   docker compose up -d
 #
-# Every engineer / AI agent connects to the shared endpoint:
-#   http://<your-host>:8708/mcp
+# Every engineer / AI agent connects to the shared endpoints:
+#   MCP (docs/code):  http://<your-host>:8708/mcp
+#   AI Q&A (RAG):     http://<your-host>:8709
 #
 #   zread install claude-code --url http://<your-host>:8708/mcp
 #   zread install codex       --url http://<your-host>:8708/mcp
-#   zread install hermes      --url http://<your-host>:8708/mcp
+#   ZREAD_AI_BACKEND_URL=http://<your-host>:8709 zread ai golang/go "How do goroutines work?"
 
 services:
   zread-mcp:
@@ -23,3 +24,27 @@ services:
       # private repositories. Everything works without it on public repos.
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       ZREAD_LANG: ${ZREAD_LANG:-en}
+
+  zread-ai:
+    build: ./backend
+    image: zread-ai:latest
+    container_name: zread-ai
+    restart: unless-stopped
+    ports:
+      - "${ZREAD_AI_PORT:-8709}:8709"
+    environment:
+      # The backend has its own GitHub token (independent of the MCP client).
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # OpenAI-compatible LLM provider. See backend/.env.example for
+      # OpenAI / Azure / OpenRouter / Ollama / LiteLLM examples.
+      ZREAD_LLM_BASE_URL: ${ZREAD_LLM_BASE_URL:-https://api.openai.com/v1}
+      ZREAD_LLM_API_KEY: ${ZREAD_LLM_API_KEY:-}
+      ZREAD_LLM_MODEL: ${ZREAD_LLM_MODEL:-gpt-4o-mini}
+      ZREAD_EMBED_MODEL: ${ZREAD_EMBED_MODEL:-text-embedding-3-small}
+      ZREAD_EMBED_DIM: ${ZREAD_EMBED_DIM:-1536}
+    volumes:
+      # Persistent storage for the SQLite DB + vector embeddings.
+      - zread-ai-data:/app/data
+
+volumes:
+  zread-ai-data:

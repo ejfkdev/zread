@@ -46,7 +46,16 @@ LOCALES_DIR = Path(__file__).resolve().parent / "locales"
 _IS_INTERACTIVE = sys.stdin.isatty() and sys.stdout.isatty()
 
 # 配置文件中允许的键（zread config set 也以此为准）
-CONFIG_KEYS = ("lang", "github_token", "github_api_url", "github_raw_url")
+CONFIG_KEYS = (
+    "lang",
+    "github_token",
+    "github_api_url",
+    "github_raw_url",
+    "ai_backend_url",
+    "ai_api_key",
+    "llm_model",
+    "embed_model",
+)
 
 
 def config_file_location() -> Path:
@@ -114,6 +123,40 @@ def github_raw_url() -> str:
         or str(config_from_file().get("github_raw_url", "") or "")
         or "https://raw.githubusercontent.com"
     ).rstrip("/")
+
+
+# ==========================================
+# AI Q&A backend (optional, self-hosted RAG)
+# ==========================================
+
+
+def ai_backend_url() -> str:
+    """Base URL of the zread-ai RAG backend (e.g. http://localhost:8709).
+
+    Priority: ZREAD_AI_BACKEND_URL env > config file. Empty when unset —
+    the AI tools are then not registered (graceful degradation, mirroring
+    the github_token gating pattern).
+    """
+    return (
+        os.environ.get("ZREAD_AI_BACKEND_URL")
+        or str(config_from_file().get("ai_backend_url", "") or "")
+    ).rstrip("/")
+
+
+def ai_api_key() -> str:
+    """Optional shared secret sent as Authorization: Bearer to the backend."""
+    return (
+        os.environ.get("ZREAD_AI_API_KEY")
+        or str(config_from_file().get("ai_api_key", "") or "")
+    )
+
+
+def ai_llm_model() -> str:
+    """LLM model override for AI tools (defaults to backend config when empty)."""
+    return (
+        os.environ.get("ZREAD_LLM_MODEL")
+        or str(config_from_file().get("llm_model", "") or "")
+    )
 
 
 def cache_dir() -> Path:

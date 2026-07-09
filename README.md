@@ -34,6 +34,7 @@ Read any GitHub repository's docs and source — from your terminal or from an A
 - [CLI Commands](#cli-commands) — [global options](#global-options) · [examples](#examples)
 - [MCP Client Configuration](#mcp-client-configuration) — [Claude Code](#claude-code) · [Codex](#codex) · [Hermes Agent](#hermes-agent)
 - [Self-hosted Deployment (Docker)](#self-hosted-deployment-docker)
+- [AI Q&A (self-hosted RAG)](#ai-qa-self-hosted-rag)
 - [MCP Tools](#mcp-tools)
 - [GitHub Token (optional)](#github-token-optional)
 - [Environment Variables](#environment-variables)
@@ -155,6 +156,9 @@ zread config get [key] | unset <key> | path
 # Configure the zread MCP server for an AI coding agent
 # (local stdio by default; -u points the agent at a shared HTTP server)
 zread install <claude-code|codex|hermes> [-u url] [-p]
+
+# Ask a question about a repo (self-hosted RAG backend; requires ZREAD_AI_BACKEND_URL)
+zread ai <repo> "<question>" [-r ref] [-m model] [--json]
 ```
 
 ### Global Options
@@ -343,6 +347,48 @@ docker run --rm zread-mcp top -p
 
 > Note: the MCP endpoint has no built-in authentication — deploy it on your internal network or behind a reverse proxy that handles auth/TLS. For a corporate TLS-inspecting proxy, pass its CA at build time: `docker build --build-arg EXTRA_CA_CERT="$(cat ca.pem)" -t zread-mcp .`
 
+## AI Q&A (self-hosted RAG)
+
+The fork can answer natural-language questions about a repository using a
+self-hosted RAG backend. The backend indexes a repo's documentation into
+vector embeddings and answers via an OpenAI-compatible LLM (OpenAI, Azure,
+OpenRouter, or a local Ollama/LiteLLM instance).
+
+**This is entirely optional.** If `ZREAD_AI_BACKEND_URL` is not set, all
+existing tools work exactly as before — no errors, no AI tools registered.
+
+### Run the backend
+
+```bash
+cd backend
+cp .env.example .env   # set ZREAD_LLM_API_KEY, optionally GITHUB_TOKEN
+pip install -e .
+uvicorn app.main:app --port 8709
+```
+
+Or with Docker (alongside the MCP server):
+
+```bash
+# .env now also holds ZREAD_LLM_* vars (see .env.example)
+docker compose up -d   # brings up zread-mcp (8708) + zread-ai (8709)
+```
+
+### Point the client at it
+
+```bash
+export ZREAD_AI_BACKEND_URL=http://localhost:8709
+
+# Ask a question from the CLI:
+zread ai golang/go "How are goroutines scheduled?"
+
+# Or via an MCP agent — the `ask` and `chat` tools appear automatically:
+#   ask(repo="golang/go", question="How are goroutines scheduled?")
+```
+
+The first question on a repo may take longer while the backend indexes its
+docs; subsequent questions stream back quickly. See [`docs/ai-backend.md`](docs/ai-backend.md)
+for the full architecture, chunking strategy, and scaling notes.
+
 ## MCP Tools
 
 All tools are backed by GitHub and need no account or token:
@@ -361,6 +407,7 @@ All tools are backed by GitHub and need no account or token:
 | `search_code`      | Search source code inside a repository (requires token) | GitHub code search |
 | `get_releases`     | Recent releases with (truncated) release notes       | GitHub releases API |
 | `get_rate_limit`   | Current API quota status (the check itself is free)  | GitHub rate-limit API |
+| `ask` / `chat`     | Ask a natural-language question about a repo (RAG) — **only registered when `ZREAD_AI_BACKEND_URL` is set** | self-hosted backend |
 
 Long outputs on `read_doc` / `read_source_file` can be capped with `max_bytes` so huge files don't blow up an agent's context window.
 
@@ -389,6 +436,9 @@ A [fine-grained or classic PAT](https://github.com/settings/tokens) with read ac
 | `ZREAD_GITHUB_API_URL` | GitHub API base URL override, e.g. `https://github.example.com/api/v3` (GitHub Enterprise) |
 | `ZREAD_GITHUB_RAW_URL` | GitHub raw-content base URL override, e.g. `https://github.example.com/raw` (GitHub Enterprise) |
 | `ZREAD_NO_CACHE`       | Set to `1` to disable the on-disk ETag response cache                        |
+| `ZREAD_AI_BACKEND_URL` | Base URL of the self-hosted RAG backend (e.g. `http://localhost:8709`). When unset, AI tools are not registered. |
+| `ZREAD_AI_API_KEY`     | Optional shared secret sent as `Authorization: Bearer` to the AI backend. |
+| `ZREAD_LLM_MODEL`      | LLM model override for AI tools (defaults to the backend's config). |
 
 ## Configuration File
 
@@ -407,6 +457,9 @@ lang = "en"           # optional, defaults to "en"
 github_token = ""     # optional, GitHub token for higher limits / private repos
 github_api_url = ""   # optional, GitHub Enterprise API base URL
 github_raw_url = ""   # optional, GitHub Enterprise raw-content base URL
+ai_backend_url = ""   # optional, self-hosted RAG backend (e.g. http://localhost:8709)
+ai_api_key = ""       # optional, shared secret for the AI backend
+llm_model = ""        # optional, LLM model override (defaults to backend config)
 ```
 
 Manage it from the CLI with `zread config get|set|unset|path` — `set` writes the file with `chmod 600` so a stored token isn't world-readable.

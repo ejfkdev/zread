@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import arrow
+import httpx
 import typer
 from rich.console import Console
 from rich.panel import Panel
@@ -33,6 +34,9 @@ from zread.config import (
     APP_VERSION,
     CONFIG_KEYS,
     _resolve_lang,
+    ai_api_key,
+    ai_backend_url,
+    ai_llm_model,
     config_file_location,
     config_from_file,
     existing_config_path,
@@ -1725,6 +1729,153 @@ def cmd_cp(
     except Exception as e:
         typer.echo(tr("errors.export_failed_with_reason", lang, error=e), err=True)
         raise typer.Exit(1)
+
+
+# ==========================================
+# ai — RAG Q&A over a repo (self-hosted backend)
+# ==========================================
+
+
+@cli_app.command(name="ai", help="Ask a question about a repo (self-hosted RAG backend).")
+def cmd_ai(
+    ctx: typer.Context,
+    repo: Annotated[
+        Optional[str],
+        typer.Argument(help="Repository as owner/repo (e.g. golang/go)."),
+    ] = None,
+    question: Annotated[
+        Optional[str], typer.Argument(help="Question to ask about the repo.")
+    ] = None,
+    ref: Annotated[
+        Optional[str], typer.Option("--ref", "-r", help="Branch / tag / commit.")
+    ] = None,
+    model: Annotated[
+        Optional[str],
+        typer.Option("--model", "-m", help="LLM model override (default: backend config)."),
+    ] = None,
+    json_output: Annotated[
+        bool, typer.Option("--json", "-j", help="Output raw JSON.")
+    ] = False,
+    lang: Annotated[
+        Optional[str], typer.Option("--lang", "-l", help=tr("cli.options.lang"))
+    ] = None,
+) -> None:
+    """Ask a question about a repository using the self-hosted RAG backend.
+
+    The first question on a repo may take longer while the backend indexes
+    its documentation; subsequent questions stream back quickly.
+
+    Examples:
+        ai golang/go "How are goroutines scheduled?"
+        ai microsoft/vscode "How do I write an extension?" --json
+        ai vuejs/vue "What is the reactivity system?" --ref v3.4.0
+    """
+    lang = _resolve_lang(lang)
+
+    backend = ai_backend_url()
+    if not backend:
+        typer.echo(
+            "AI backend not configured.\n"
+            "Set ZREAD_AI_BACKEND_URL (e.g. http://localhost:8709) "
+            "or run: zread config set ai_backend_url http://localhost:8709",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if not repo or not question:
+        typer.echo(ctx.get_help())
+        typer.echo(
+            "\nUsage: zread ai <owner/repo> <question>", err=True
+        )
+        raise typer.Exit(1)
+
+    # Resolve repo + ref into the backend's repo_id.
+    parsed = parse_repo_url(repo)
+    owner = parsed.get("owner", "")
+    repo_name = parsed.get("repo", "")
+    if not owner or not repo_name:
+        typer.echo(f"Could not parse repo from '{repo}'.", err=True)
+        raise typer.Exit(1)
+    resolved_ref = ref or parsed.get("ref") or ""
+    repo_id = (
+        f"{owner}/{repo_name}@{resolved_ref}" if resolved_ref else f"{owner}/{repo_name}"
+    )
+
+    asyncio.run(
+        _ai_ask_async(
+            backend=backend,
+            repo_id=repo_id,
+            question=question,
+            model=model,
+            json_output=json_output,
+        )
+    )
+
+
+async def _ai_ask_async(
+    backend: str,
+    repo_id: str,
+    question: str,
+    model: Optional[str],
+    json_output: bool,
+) -> None:
+    """Run one ask: create talk → stream answer → delete talk."""
+    from zread.ai_client import create_talk, delete_talk, stream_message
+
+    async with httpx.AsyncClient() as client:
+        try:
+            talk_id = await create_talk(client, backend, repo_id, ai_api_key())
+        except httpx.HTTPError as exc:
+            typer.echo(f"Backend unreachable at {backend}: {exc}", err=True)
+            raise typer.Exit(1)
+
+        answer_parts: list[str] = []
+        reasoning_parts: list[str] = []
+        try:
+            if not json_output:
+                typer.echo("")  # blank line before streamed answer
+            async for ev in stream_message(
+                client,
+                backend,
+                talk_id,
+                question,
+                model or ai_llm_model() or None,
+                ai_api_key(),
+            ):
+                if ev.is_error:
+                    typer.echo(f"\nError: {ev.text}", err=True)
+                    break
+                if ev.is_finish:
+                    break
+                if ev.event == "answer":
+                    if json_output:
+                        if ev.text:
+                            answer_parts.append(ev.text)
+                        if ev.reasoning_content:
+                            reasoning_parts.append(ev.reasoning_content)
+                    else:
+                        # Stream tokens live to the terminal.
+                        if ev.reasoning_content:
+                            typer.echo(ev.reasoning_content, nl=False)
+                        if ev.text:
+                            typer.echo(ev.text, nl=False)
+        finally:
+            await delete_talk(client, backend, talk_id, ai_api_key())
+
+        if json_output:
+            typer.echo(
+                json.dumps(
+                    {
+                        "answer": "".join(answer_parts),
+                        "reasoning": "".join(reasoning_parts),
+                        "repo_id": repo_id,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            typer.echo("")  # trailing newline after streamed text
 
 
 def main():

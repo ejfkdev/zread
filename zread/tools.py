@@ -22,6 +22,7 @@ from zread.github import (
     fetch_repo_files,
     fetch_repo_outline,
     get_trending_repos,
+    parse_repo_url,
     recommend_repos,
     _github_search_repos,
 )
@@ -570,6 +571,95 @@ def get_rate_limit() -> _RateLimitResult:
     if result is None:
         return {"error": tr("errors.fetch_rate_limit_failed")}
     return result
+
+
+# ==========================================
+# MCP Tools: AI Q&A (self-hosted RAG backend; registered only when configured)
+# ==========================================
+
+
+class _AskResult(TypedDict, total=False):
+    answer: str
+    reasoning: str
+    repo_id: str
+    error: str
+
+
+def ask(repo: str, question: str, ref: Optional[str] = None) -> _AskResult:
+    """Ask a question about a repository and get a grounded answer.
+
+    Uses a self-hosted RAG backend that indexes the repo's documentation into
+    embeddings and answers via an OpenAI-compatible LLM. The first question
+    on a repo may take longer (auto-indexing); subsequent questions are fast.
+
+    Args:
+        repo: Repository as owner/repo (e.g. "golang/go"). A full GitHub URL
+            or owner/repo@ref form is also accepted.
+        question: The question to ask about the repo.
+        ref: Optional branch/tag/commit (defaults to the repo's default branch).
+
+    Returns:
+        {"answer": str, "reasoning": str (optional thinking), "repo_id": str}
+        or {"error": str} if the backend is unreachable.
+    """
+    import asyncio
+
+    from zread.ai_client import create_talk, delete_talk, stream_message
+    from zread.config import ai_api_key, ai_backend_url, ai_llm_model
+
+    backend = ai_backend_url()
+    if not backend:
+        return {"error": "AI backend not configured (set ZREAD_AI_BACKEND_URL)."}
+
+    parsed = parse_repo_url(repo)
+    owner = parsed.get("owner", "")
+    repo_name = parsed.get("repo", "")
+    if not owner or not repo_name:
+        return {"error": f"Could not parse repo from '{repo}'."}
+    resolved_ref = ref or parsed.get("ref") or ""
+    repo_id = f"{owner}/{repo_name}@{resolved_ref}" if resolved_ref else f"{owner}/{repo_name}"
+
+    async def _run() -> _AskResult:
+        import httpx as _httpx
+
+        async with _httpx.AsyncClient() as client:
+            try:
+                talk_id = await create_talk(client, backend, repo_id, ai_api_key())
+            except _httpx.HTTPError as exc:
+                return {"error": f"Backend unreachable: {exc}", "repo_id": repo_id}
+            try:
+                answer_parts: list[str] = []
+                reasoning_parts: list[str] = []
+                async for ev in stream_message(
+                    client, backend, talk_id, question, ai_llm_model() or None, ai_api_key()
+                ):
+                    if ev.is_error:
+                        return {"error": ev.text or "stream error", "repo_id": repo_id}
+                    if ev.text:
+                        answer_parts.append(ev.text)
+                    if ev.reasoning_content:
+                        reasoning_parts.append(ev.reasoning_content)
+                return {
+                    "answer": "".join(answer_parts),
+                    "reasoning": "".join(reasoning_parts),
+                    "repo_id": repo_id,
+                }
+            finally:
+                await delete_talk(client, backend, talk_id, ai_api_key())
+
+    try:
+        return asyncio.run(_run())
+    except RuntimeError as exc:
+        return {"error": str(exc), "repo_id": repo_id}
+
+
+def chat(repo: str, question: str, ref: Optional[str] = None) -> _AskResult:
+    """Conversational alias for ask(). Streams then returns the full answer.
+
+    Kept as a distinct tool so agents can pick a "chat" affordance. Same
+    behavior and return shape as ``ask``.
+    """
+    return ask(repo, question, ref)
 
 
 # ==========================================
