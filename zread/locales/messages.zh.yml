@@ -6,17 +6,28 @@ zh:
     env_vars_title: 环境变量
     env_var_lang_desc: 默认语言（zh/en），优先级低于 --lang、高于系统locale
     env_var_github_token_desc: 可选的 GitHub token，提升 API 速率限制并访问私有仓库
+    env_var_api_url_desc: 覆盖 GitHub API 地址（GitHub Enterprise）
+    env_var_raw_url_desc: 覆盖 GitHub raw 文件地址（GitHub Enterprise）
+    env_var_no_cache_desc: 设为 1 可禁用磁盘 ETag 响应缓存
     show_version: 显示版本号
     show_help: 显示帮助信息
     commands:
       mcp: 启动 MCP 服务器
       ls: 获取文档目录结构
       cat: 查看仓库的文档或源代码文件（来自 GitHub）
-      find: 搜索 GitHub 仓库，或在指定仓库文档内搜索关键词
+      find: 搜索 GitHub 仓库，或在指定仓库的文档 / 源码内搜索关键词
       top: 获取热门仓库榜单
       rand: 随机发现推荐仓库
       stat: 显示仓库信息
+      tree: 列出仓库文件（可按目录过滤）
+      releases: 查看仓库最近的 Releases
+      limits: 显示 GitHub API 配额状态（查询本身不消耗配额）
       cp: 导出仓库文档到本地，并生成 llms.txt / llms-full.txt
+      config: 读写 zread 配置文件（lang、github_token 等）
+      config_path: 显示配置文件路径
+      config_get: 读取配置项（不带 key 显示全部）
+      config_set: 写入配置项
+      config_unset: 删除配置项
       install: 为 AI 编码智能体配置 zread MCP 服务（Claude Code / Codex / Hermes）
     args:
       transport: 传输协议：stdio / sse / http
@@ -31,6 +42,9 @@ zh:
       topic_optional: GitHub topic 标签，如 python、awesome-list、agent-skills（可选）
       output_dir: 输出目录（默认：当前目录）
       agent: 目标智能体：claude-code / codex / hermes
+      tree_path: 可选的目录过滤前缀，如 src/net
+      config_key: 配置键：lang / github_token / github_api_url / github_raw_url
+      config_value: 要保存的值
     options:
       lang: 语言：zh / en
       json: JSON 格式输出
@@ -38,6 +52,12 @@ zh:
       concurrency: 并发数（默认：10）
       print_only: 仅打印配置内容，不做任何修改
       mcp_url: 共享 zread MCP 服务的 URL（HTTP 模式），如 http://zread.internal:8708/mcp——智能体连接该地址而非启动本地进程
+      ref: 分支 / tag / commit（默认使用仓库默认分支）
+      code_search: 搜索源码而非文档（需要 GITHUB_TOKEN）
+      limit: 最多显示的条目数
+      include_source: 同时下载源码文件（跳过二进制与大于 512 KB 的文件，最多 500 个）
+      front_matter: 为导出的文档添加 YAML front matter（路径、仓库、源链接）
+      llms_only: 只生成 llms.txt / llms-full.txt，不保留单页文件
   status:
     fetch_outline: 正在获取文档目录...
     fetch_page: 正在获取页面内容...
@@ -46,8 +66,12 @@ zh:
     fetch_file_content: 正在获取文件内容...
     search_docs: 正在搜索文档...
     search_repos: 正在搜索仓库...
+    search_code: 正在搜索代码...
     fetch_trending: 正在获取热门仓库...
     fetch_recommend: 正在获取推荐仓库...
+    fetch_tree: 正在获取仓库文件树...
+    fetch_releases: 正在获取 Releases...
+    fetch_limits: 正在获取配额状态...
     downloading_repo: 📥 下载 %{repo}...
   errors:
     missing_repo: 缺少必选参数：REPO（仓库路径，格式：owner/repo）
@@ -69,6 +93,7 @@ zh:
     invalid_repo_format: 请使用 owner/repo 格式，例如：openclaw/openclaw
     file_not_found_or_inaccessible: 文件不存在或无法访问
     parse_repo_and_file_failed: 错误：无法解析仓库路径和文件路径
+    parse_repo_url_failed: 无法解析仓库路径：%{input}（请使用 owner/repo 或完整 GitHub URL）
     fetch_file_content: 错误：无法获取文件内容
     fetch_repo_outline_failed: ❌ 获取仓库目录失败
     fetch_page_for_slug_failed: ❌ 无法获取页面内容：%{slug}
@@ -77,8 +102,17 @@ zh:
     fetch_trending_repo_failed: ❌ 获取热门仓库失败
     fetch_repo_info_failed: ❌ 获取仓库信息失败
     fetch_file_failed_for_path: ❌ 无法获取文件：%{path}
+    fetch_tree_failed: ❌ 获取仓库文件树失败
+    fetch_releases_failed: ❌ 获取 Releases 失败
+    fetch_rate_limit_failed: ❌ 获取配额状态失败
     github_request_failed: GitHub 请求失败：%{error}
     github_rate_limited: GitHub API 速率限制已用尽，可设置 GITHUB_TOKEN 环境变量提升限额。
+    rate_limit_resets: 限额将于%{when}重置。
+    code_search_needs_token: GitHub 代码搜索需要认证：请设置 GITHUB_TOKEN，或执行 `zread config set github_token <token>`。
+    tree_truncated_warning: ⚠️ GitHub 返回的 %{repo} 文件树被截断，结果可能不完整。
+    unknown_transport: 未知的传输协议：%{transport}（支持：stdio / sse / http）
+    invalid_address: 无效的地址：%{address}
+    invalid_config_key: 未知的配置键：%{name}（支持：%{supported}）
   messages:
     no_results: 无结果
     unknown_error: 未知错误
@@ -87,19 +121,30 @@ zh:
     no_preview: 无预览内容
     file_info: 📄 %{file_path} | 总行数：%{total_lines} | 大小：%{size}
     file_info_showing_lines: ' | 显示：%{start}-%{end} 行'
+    truncated_output: '[……已截断：显示 %{shown} / %{total} 字节]'
+    tree_summary: 显示 %{shown} / %{total} 个文件
+    releases_none: 暂无 Releases
     exporting_repo: 📦 正在导出：%{repo}
     output_dir: 📁 输出目录：%{path}
     language_label: 🌐 语言：%{lang_code}
     concurrency_label: ⚡ 并发数：%{concurrency}
     export_complete: ✅ 导出完成！
-    export_total: '   总计：%{count} 页'
+    export_total: '   总计：%{count} 个文件'
     export_success: '   成功：%{count} 页'
     export_failed: '   失败：%{count} 页'
+    export_source_files: '   源码文件：%{count}'
     export_repo_dir: 📄 文档目录：%{path}
     export_llms_file: 📄 llms.txt（目录索引）：%{path}
     export_llms_full_file: 📄 llms-full.txt（完整内容）：%{path}
     export_failed_pages: ⚠️ 以下页面导出失败：
     direct_trending_title: GitHub：本周新建仓库星标榜
+  limits:
+    resource: 资源
+    remaining: 剩余
+    limit: 上限
+    resets: 重置时间
+    token_active: 已配置 GitHub token（认证限额）
+    token_missing: 未配置 GitHub token（匿名限额——设置 GITHUB_TOKEN 可提升）
   install:
     unknown_agent: 未知的智能体：%{agent}（支持：%{supported}）
     running: 正在执行：%{command}
@@ -124,3 +169,5 @@ zh:
     windows: Windows 配置文件
     found: 配置文件已找到：%{path}
     not_found: 配置文件不存在（可选）
+    set_ok: ✅ %{name} 已保存到 %{path}
+    unset_ok: ✅ 已从 %{path} 删除 %{name}
