@@ -17,6 +17,12 @@ _log = logging.getLogger("zread_ai.embedder")
 
 _EMBED_TIMEOUT = 60.0
 _MAX_RETRIES = 4
+# Status codes treated as transient (retryable). 502/503/429 are all gateway
+# overload or rate-limit signals — safe to back off and retry.
+_RETRYABLE = {429, 502, 503}
+# Small pacing delay between successful batches so we don't slam a gateway
+# that fans out one upstream call per input (e.g. freellmapi → Google free-tier).
+_BATCH_PACE_S = 0.5
 
 
 async def embed_texts(client: httpx.AsyncClient, texts: List[str]) -> List[List[float]]:
@@ -36,6 +42,10 @@ async def embed_texts(client: httpx.AsyncClient, texts: List[str]) -> List[List[
         batch = texts[i : i + bs]
         vectors = await _embed_batch_with_retry(client, url, headers, batch)
         out.extend(vectors)
+        # Pace between batches to avoid overwhelming a gateway that fans out
+        # one upstream call per input (rate-limited free-tier providers).
+        if i + bs < len(texts):
+            await asyncio.sleep(_BATCH_PACE_S)
     return out
 
 
@@ -55,7 +65,7 @@ async def _embed_batch_with_retry(
                 json={"model": settings.embed_model, "input": batch},
                 timeout=_EMBED_TIMEOUT,
             )
-            if resp.status_code in (429, 503):
+            if resp.status_code in _RETRYABLE:
                 delay = _backoff(resp, attempt)
                 _log.warning(
                     "embeddings got %d (batch of %d), retrying in %.1fs",
@@ -72,7 +82,7 @@ async def _embed_batch_with_retry(
             return [item["embedding"] for item in items]
         except httpx.HTTPStatusError as exc:
             last_exc = exc
-            if exc.response.status_code in (429, 503):
+            if exc.response.status_code in _RETRYABLE:
                 await asyncio.sleep(_backoff(exc.response, attempt))
                 continue
             raise
