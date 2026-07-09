@@ -86,6 +86,14 @@ async def _fetch_page_async(
         file_path = None
         if save:
             file_path = output_dir / slug
+            # 防路径穿越：slug 来自远端 tree 响应（API 端点可被配置覆盖），
+            # 绝不允许写出 output_dir 之外
+            root = output_dir.resolve()
+            resolved = file_path.resolve()
+            if resolved == root or not resolved.is_relative_to(root):
+                if progress_cb:
+                    progress_cb()
+                return {"success": False, "page": page, "error": "unsafe path"}
             file_path.parent.mkdir(parents=True, exist_ok=True)
             saved_content = md_content
             if front_matter:

@@ -90,3 +90,45 @@ def test_cache_disabled_by_default_in_tests(tmp_path):
     _gh_api_get("/repos/o/rr")
     _gh_api_get("/repos/o/rr")
     assert "if-none-match" not in route.calls[1].request.headers
+
+
+@respx.mock
+def test_api_cache_keys_vary_by_accept(tmp_path, monkeypatch):
+    monkeypatch.setenv("ZREAD_NO_CACHE", "0")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+
+    route = respx.get(f"{API}/search/code")
+    route.side_effect = [
+        httpx.Response(200, json={"kind": "plain"}, headers={"etag": 'W/"1"'}),
+        httpx.Response(200, json={"kind": "textmatch"}, headers={"etag": 'W/"2"'}),
+        httpx.Response(304),
+        httpx.Response(304),
+    ]
+    accept = "application/vnd.github.text-match+json"
+    assert _gh_api_get("/search/code") == {"kind": "plain"}
+    assert _gh_api_get("/search/code", accept=accept) == {"kind": "textmatch"}
+    # 304 复验各自命中正确的变体（此前 Accept 不参与缓存键会串味）
+    assert _gh_api_get("/search/code") == {"kind": "plain"}
+    assert _gh_api_get("/search/code", accept=accept) == {"kind": "textmatch"}
+    assert route.calls[2].request.headers["if-none-match"] == 'W/"1"'
+    assert route.calls[3].request.headers["if-none-match"] == 'W/"2"'
+
+
+@respx.mock
+def test_private_raw_revalidates_with_token(tmp_path, monkeypatch):
+    monkeypatch.setenv("ZREAD_NO_CACHE", "0")
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_x")
+
+    route = respx.get(f"{RAW}/o/priv/HEAD/README.md")
+    route.side_effect = [
+        httpx.Response(404),  # 匿名请求（私有仓库）
+        httpx.Response(200, text="secret", headers={"etag": '"p1"'}),
+        httpx.Response(404),  # 第二次的匿名请求
+        httpx.Response(304),  # 带 token 的复验命中
+    ]
+    assert _gh_fetch_raw("o", "priv", "README.md") == "secret"
+    assert _gh_fetch_raw("o", "priv", "README.md") == "secret"
+    # token 重试请求带上了 If-None-Match（此前私有文件永远无法 304 复验）
+    assert route.calls[3].request.headers["if-none-match"] == '"p1"'
+    assert route.calls[3].request.headers["authorization"] == "Bearer ghp_x"

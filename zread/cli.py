@@ -489,13 +489,14 @@ def cmd_get_outline(
     parsed = parse_repo_url(repo)
     owner, repo_name = parsed["owner"], parsed["repo"]
 
+    use_ref = ref or parsed.get("ref")
     if json_output:
         typer.echo(json.dumps({"pages": outline}, ensure_ascii=False, indent=2))
     elif plain:
-        output = _format_outline_plain({"pages": outline}, owner, repo_name)
+        output = _format_outline_plain({"pages": outline}, owner, repo_name, use_ref)
         typer.echo(output)
     else:
-        _format_outline_rich({"pages": outline}, owner, repo_name)
+        _format_outline_rich({"pages": outline}, owner, repo_name, use_ref)
 
 
 # zread slug 模式: 纯数字序号 或 数字前缀 slug
@@ -911,7 +912,10 @@ def cmd_find(
         else:
             _search_in_repo(query, keyword, lang, json_output, plain, ref)
     else:
-        # 在 GitHub 上搜索仓库
+        # 在 GitHub 上搜索仓库；--code 只在仓库内搜索时有意义，静默忽略会误导
+        if code:
+            typer.echo(f"❌ {tr('errors.code_search_needs_repo', lang)}", err=True)
+            raise typer.Exit(1)
         full_query = query
         if repo:
             full_query += " " + repo
@@ -949,7 +953,7 @@ def _search_in_repo(
     elif plain:
         typer.echo(_format_search_results_plain(results))
     else:
-        _format_search_results_rich(results, repo)
+        _format_search_results_rich(results, repo, ref)
 
 
 def _search_code_in_repo(
@@ -1477,7 +1481,14 @@ def _write_config_values(values: Dict[str, Any]) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["[zread]"]
     for key, value in values.items():
-        escaped = str(value).replace("\\", "\\\\").replace('"', '\\"')
+        escaped = (
+            str(value)
+            .replace("\\", "\\\\")
+            .replace('"', '\\"')
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+        )
         lines.append(f'{key} = "{escaped}"')
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:

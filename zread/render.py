@@ -423,7 +423,9 @@ def _format_status_plain(item: Dict, lang: str) -> str:
 
 
 # --- Outline 格式化 ---
-def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
+def _format_outline_plain(
+    data: Dict, owner: str, repo_name: str, ref: Optional[str] = None
+) -> str:
     """纯文本格式输出大纲"""
     lines = []
     pages = data.get("pages", [])
@@ -447,7 +449,7 @@ def _format_outline_plain(data: Dict, owner: str, repo_name: str) -> str:
         if section not in groups:
             groups[section] = {}
 
-        full_url = _page_url(owner, repo_name, slug)
+        full_url = _page_url(owner, repo_name, slug, ref)
 
         if group:
             if group not in groups[section]:
@@ -484,7 +486,9 @@ def _extract_slug_number(slug: str) -> str:
     return match.group(1) if match else ""
 
 
-def _format_outline_rich(data: Dict, owner: str, repo_name: str) -> None:
+def _format_outline_rich(
+    data: Dict, owner: str, repo_name: str, ref: Optional[str] = None
+) -> None:
     """Rich 格式输出大纲（使用 Tree 组件）"""
     pages = data.get("pages", [])
     if not pages:
@@ -506,7 +510,7 @@ def _format_outline_rich(data: Dict, owner: str, repo_name: str) -> None:
         group = page.get("group", "")
         topic = page.get("topic", "")
         display_title = topic or title
-        full_url = _page_url(owner, repo_name, slug)
+        full_url = _page_url(owner, repo_name, slug, ref)
 
         if section not in sections:
             sections[section] = {}
@@ -587,7 +591,9 @@ def _clean_and_extract_em(text: str) -> "tuple[str, list[tuple[int, int]]]":
     return cleaned_no_em, em_positions
 
 
-def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
+def _format_search_results_rich(
+    results: List[Dict], repo: str = "", ref: Optional[str] = None
+) -> None:
     """Rich 格式输出文档搜索结果 (CLI 模式，保留 <em> 并高亮)"""
     console = Console()
 
@@ -597,10 +603,19 @@ def _format_search_results_rich(results: List[Dict], repo: str = "") -> None:
         slug_num = _extract_slug_number(slug)
         prefix = f"{slug_num}. " if slug_num else ""
         if repo and "/" in repo:
-            owner_part, name_part = repo.split("/", 1)
-            page_url = _page_url(owner_part, name_part, slug)
+            # 通过 parse_repo_url 归一化，owner/repo@ref 形式也能生成正确链接
+            try:
+                parsed_repo = parse_repo_url(repo)
+                page_url = _page_url(
+                    parsed_repo["owner"],
+                    parsed_repo["repo"],
+                    slug,
+                    ref or parsed_repo.get("ref"),
+                )
+            except ValueError:
+                page_url = f"https://github.com/{repo}/blob/{ref or 'HEAD'}/{slug}"
         else:
-            page_url = f"https://github.com/{repo}/blob/HEAD/{slug}"
+            page_url = f"https://github.com/{repo}/blob/{ref or 'HEAD'}/{slug}"
 
         contents = []
         for match in result.get("matches", []):
@@ -671,6 +686,8 @@ def _process_markdown_links(content: str, repo: str) -> str:
 
     # slug 格式: 数字-名称
     slug_pattern = re.compile(r"^\d+-[a-zA-Z0-9-]+(?<!-)$")
+    # 任意 URI scheme（mailto:、ftp:、tel: 等）
+    scheme_pattern = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*:")
 
     def _prefix_slug_text(text: str, slug: str) -> str:
         slug_num_match = re.match(r"^(\d+)-", slug)
@@ -678,6 +695,12 @@ def _process_markdown_links(content: str, repo: str) -> str:
             return text
         prefix = f"{slug_num_match.group(1)}."
         return text if text.startswith(prefix) else f"{prefix}{text}"
+
+    def _relative_to_blob_url(url: str) -> str:
+        # 统一使用 HEAD（指向默认分支）；硬编码 main 会给默认分支为
+        # master 的仓库生成 404 链接。去掉 ./ 与 / 前缀避免链接含 /./
+        file_path = re.sub(r"^(?:\./)+", "", url).lstrip("/")
+        return f"https://github.com/{repo_path}/blob/HEAD/{file_path}"
 
     def _rewrite_markdown_link(full_match: str, text: str, url: str) -> str:
         url_path = url.split("#")[0]
@@ -688,20 +711,19 @@ def _process_markdown_links(content: str, repo: str) -> str:
             link_text = _prefix_slug_text(text, last_segment)
             if url.startswith(("http://", "https://")):
                 full_url = url
+            elif scheme_pattern.match(url):
+                # mailto:、ftp: 等非 http scheme 保持原样
+                return full_match
             else:
-                file_path = url.lstrip("/")
-                full_url = f"https://github.com/{repo_path}/blob/HEAD/{file_path}"
+                full_url = _relative_to_blob_url(url)
             return f"[🔗{link_text}]({full_url})"
 
         if "." in last_segment:
-            if url.startswith(("http://", "https://")):
-                full_url = url
-            else:
-                # 统一使用 HEAD（指向默认分支）；硬编码 main 会给
-                # 默认分支为 master 的仓库生成 404 链接
-                file_path = url.lstrip("/")
-                full_url = f"https://github.com/{repo_path}/blob/HEAD/{file_path}"
-            return f"[🐙{text}]({full_url})"
+            # 绝对 URL / 带 scheme 的链接不是仓库内文件：保持原样，
+            # 不加 🐙 标记（此前 example.com、mailto: 都被误标 / 误改写）
+            if url.startswith(("http://", "https://")) or scheme_pattern.match(url):
+                return full_match
+            return f"[🐙{text}]({_relative_to_blob_url(url)})"
 
         return full_match
 

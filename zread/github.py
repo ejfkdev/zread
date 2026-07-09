@@ -208,13 +208,16 @@ def _rate_limit_message(response: Any, lang: str) -> str:
     return message
 
 
-def _cache_key(url: str, params: Optional[dict]) -> str:
+def _cache_key(url: str, params: Optional[dict], accept: Optional[str] = None) -> str:
     key = url
     if params:
         key += "?" + urllib.parse.urlencode(sorted(params.items()))
     # 带 token 与匿名的可见内容不同，缓存需区分
     if github_token():
         key += "#auth"
+    # Accept 媒体类型影响响应体结构（如 code search 的 text-match），必须参与键
+    if accept:
+        key += f"#accept={accept}"
     return key
 
 
@@ -234,7 +237,7 @@ def _gh_api_get(
         headers["Accept"] = accept
 
     disk = http_cache()
-    key = _cache_key(url, params)
+    key = _cache_key(url, params, accept)
     entry = disk.load(key) if disk else None
     if entry:
         headers["If-None-Match"] = entry["etag"]
@@ -297,14 +300,15 @@ def _gh_fetch_raw(
         response = httpx.get(url, headers=base_headers, timeout=30)
         token = github_token()
         if response.status_code == 404 and token:
-            response = httpx.get(
-                url,
-                headers={
-                    "User-Agent": USER_AGENT,
-                    "Authorization": f"Bearer {token}",
-                },
-                timeout=30,
-            )
+            retry_headers = {
+                "User-Agent": USER_AGENT,
+                "Authorization": f"Bearer {token}",
+            }
+            # 私有文件只有带 token 的请求能命中：条件头也要带上，
+            # 让 304 复验同样适用于私有仓库
+            if entry:
+                retry_headers["If-None-Match"] = entry["etag"]
+            response = httpx.get(url, headers=retry_headers, timeout=30)
         if response.status_code == 304 and entry is not None:
             METRICS["cache_revalidated_304"] += 1
             return entry["body"]
@@ -342,7 +346,9 @@ def _gh_repo_get(owner: str, repo: str, lang: str = "zh") -> Optional[Dict[str, 
     if cached is not MISSING:
         return cached
     value = _gh_api_get(f"/repos/{owner}/{repo}", lang=lang)
-    _GH_REPO_CACHE.set(key, value)
+    # 失败（404 或网络错误）不缓存：瞬时故障不应污染后续 15 分钟的请求
+    if value is not None:
+        _GH_REPO_CACHE.set(key, value)
     return value
 
 
@@ -373,7 +379,6 @@ def _gh_full_tree(
     if not tree_ref:
         info = _gh_repo_get(owner, repo, lang)
         if not info:
-            _GH_TREE_CACHE.set(key, None)
             return None
         tree_ref = info.get("default_branch") or "HEAD"
 
@@ -383,7 +388,7 @@ def _gh_full_tree(
         lang=lang,
     )
     if not data:
-        _GH_TREE_CACHE.set(key, None)
+        # 失败不缓存，避免瞬时故障被负缓存 15 分钟
         return None
 
     files = [
