@@ -35,11 +35,14 @@ RUN pip install --no-cache-dir . && rm -rf /root/.cache
 
 # Run as a non-root user
 RUN useradd --create-home --uid 1000 zread
-USER zread
 
 # Persistent storage for the SQLite DB + embeddings.
-RUN mkdir -p /app/data
+# Created as root (before USER switch) so the non-root user can't be denied,
+# then chowned so the zread user can write the DB at runtime.
+RUN mkdir -p /app/data && chown -R zread:zread /app/data
 VOLUME ["/app/data"]
+
+USER zread
 
 # Configuration (set at run time):
 #   GITHUB_TOKEN         required for private repos / higher API limits
