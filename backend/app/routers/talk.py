@@ -16,14 +16,15 @@ import time
 import uuid
 from typing import Any, AsyncIterator, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.auth import require_api_key
 from app.db import get_db
-from app.models import MessageSend, TalkCreate, err, ok
+from app.models import MessageSend, TalkCreate, ok
 from app.rag import answer_stream, ensure_indexed
 
-router = APIRouter(tags=["talk"])
+router = APIRouter(tags=["talk"], dependencies=[Depends(require_api_key)])
 _log = logging.getLogger("zread_ai.talk_router")
 
 

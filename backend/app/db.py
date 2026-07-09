@@ -6,7 +6,7 @@ Single-file DB; the vec0 virtual table holds embeddings keyed by chunk_id.
 
 import sqlite3
 import threading
-from typing import Any, Optional
+from typing import Optional
 
 import sqlite_vec
 

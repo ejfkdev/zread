@@ -361,7 +361,7 @@ existing tools work exactly as before — no errors, no AI tools registered.
 
 ```bash
 cd backend
-cp .env.example .env   # set ZREAD_LLM_API_KEY, optionally GITHUB_TOKEN
+cp .env.example .env   # set BACKEND_API_KEY + ZREAD_LLM_API_KEY, optionally GITHUB_TOKEN
 pip install -e .
 uvicorn app.main:app --port 8709
 ```
@@ -369,9 +369,15 @@ uvicorn app.main:app --port 8709
 Or with Docker (alongside the MCP server):
 
 ```bash
-# .env now also holds ZREAD_LLM_* vars (see .env.example)
+# .env now also holds ZREAD_LLM_* + ZREAD_BACKEND_API_KEY (see .env.example)
 docker compose up -d   # brings up zread-mcp (8708) + zread-ai (8709)
 ```
+
+> **Security:** set `BACKEND_API_KEY` (server) / `ZREAD_AI_API_KEY` (client) to the
+> same shared secret for any network-exposed deployment. Without it, anyone who can
+> reach the backend can spend your GitHub API quota and LLM credits. The client sends
+> the key as `Authorization: Bearer`; the backend validates it with a constant-time
+> compare. `/healthz` stays open (it's the Docker healthcheck target).
 
 ### Point the client at it
 
@@ -437,7 +443,7 @@ A [fine-grained or classic PAT](https://github.com/settings/tokens) with read ac
 | `ZREAD_GITHUB_RAW_URL` | GitHub raw-content base URL override, e.g. `https://github.example.com/raw` (GitHub Enterprise) |
 | `ZREAD_NO_CACHE`       | Set to `1` to disable the on-disk ETag response cache                        |
 | `ZREAD_AI_BACKEND_URL` | Base URL of the self-hosted RAG backend (e.g. `http://localhost:8709`). When unset, AI tools are not registered. |
-| `ZREAD_AI_API_KEY`     | Optional shared secret sent as `Authorization: Bearer` to the AI backend. |
+| `ZREAD_AI_API_KEY`     | Shared secret sent as `Authorization: Bearer` to the AI backend. **Must match** the backend's `ZREAD_BACKEND_API_KEY`. |
 | `ZREAD_LLM_MODEL`      | LLM model override for AI tools (defaults to the backend's config). |
 
 ## Configuration File

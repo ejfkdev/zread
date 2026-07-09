@@ -13,7 +13,6 @@ from typing import List
 import httpx
 
 from app.chunker import Chunk, chunk_markdown
-from app.config import settings
 from app.db import get_db
 from app.embedder import embed_texts
 from app.github import (

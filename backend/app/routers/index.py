@@ -5,14 +5,14 @@ import logging
 import time
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.config import settings
+from app.auth import require_api_key
 from app.db import get_db
-from app.models import Envelope, IndexRequest, RepoStatus, err, ok
+from app.models import RepoStatus, ok
 from app.indexer import index_repo
 
-router = APIRouter(tags=["index"])
+router = APIRouter(tags=["index"], dependencies=[Depends(require_api_key)])
 _log = logging.getLogger("zread_ai.index_router")
 
 

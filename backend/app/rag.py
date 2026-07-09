@@ -10,7 +10,7 @@ from app.config import settings
 from app.db import get_db
 from app.embedder import embed_query
 from app.github import GitHubError
-from app.indexer import index_repo, _repo_id
+from app.indexer import index_repo
 from app.llm import build_messages, stream_chat
 from app.retriever import retrieve
 

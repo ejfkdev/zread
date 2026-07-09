@@ -99,6 +99,24 @@ Re-indexing happens when:
 re-index call or the first-question flow is sufficient. A future enhancement
 could poll the repo's `pushed_at` and re-index when it changes.
 
+## Authentication (CWE-306 mitigation)
+
+Every `/api/v1/*` route is gated by a FastAPI dependency (`app/auth.py`) that
+requires a shared secret in the `Authorization: Bearer <key>` header. The
+secret is configured via `BACKEND_API_KEY` (env) on the server and
+`ZREAD_AI_API_KEY` on the client; they must match.
+
+- **Constant-time comparison** (`hmac.compare_digest`) resists timing attacks.
+- **`/healthz` is intentionally open** — it's the Docker healthcheck target
+  and exposes no sensitive data (just `status`/`version`).
+- **Fail-open with a warning when unset:** if `BACKEND_API_KEY` is empty, the
+  API is left open (for local dev / first-run convenience), but a warning is
+  logged at startup. Set the key before exposing the service on a network.
+
+Without this, any caller who can reach the backend could trigger indexing and
+spend the operator's GitHub API quota and LLM credits.
+
+
 ## LLM provider compatibility
 
 The backend talks to any OpenAI-compatible `/chat/completions` and

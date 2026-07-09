@@ -35,6 +35,10 @@ services:
     environment:
       # The backend has its own GitHub token (independent of the MCP client).
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      # Shared secret required on every /api/v1 request. Set this for any
+      # network-exposed deployment; the client must send the same value via
+      # ZREAD_AI_API_KEY. Leave empty only for local dev (API is then open).
+      BACKEND_API_KEY: ${ZREAD_BACKEND_API_KEY:-}
       # OpenAI-compatible LLM provider. See backend/.env.example for
       # OpenAI / Azure / OpenRouter / Ollama / LiteLLM examples.
       ZREAD_LLM_BASE_URL: ${ZREAD_LLM_BASE_URL:-https://api.openai.com/v1}

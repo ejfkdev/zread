@@ -14,7 +14,7 @@ os.environ["CHUNK_OVERLAP_TOKENS"] = "10"
 
 import pytest  # noqa: E402
 
-from app.db import close_db, get_db, reset_db  # noqa: E402
+from app.db import get_db, reset_db  # noqa: E402
 
 
 @pytest.fixture(autouse=True)

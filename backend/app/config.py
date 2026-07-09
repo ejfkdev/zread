@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8709
     cors_origins: List[str] = ["*"]
+    # Shared secret required on every /api/v1 request (Authorization: Bearer).
+    # When unset the API is open — log a warning so operators notice.
+    backend_api_key: str = ""
 
     # --- GitHub (the backend fetches repos itself) ----------------------
     github_token: str = ""

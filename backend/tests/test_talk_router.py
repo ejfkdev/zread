@@ -5,7 +5,6 @@ The LLM stream is mocked so no real provider is hit. The repo is pre-seeded
 with chunks so retrieval returns context without network access.
 """
 
-import asyncio
 import json
 from unittest.mock import AsyncMock, patch
 
@@ -115,7 +114,7 @@ def test_error_event_on_failure():
 
     async def _boom(*a, **kw):
         raise RuntimeError("boom")
-        yield  # noqa: unreachable — makes this an async generator
+        yield  # makes this an async generator (unreachable)
 
     with patch("app.routers.talk.answer_stream", _boom), patch(
         "app.routers.talk.ensure_indexed", new=AsyncMock(return_value=None)
