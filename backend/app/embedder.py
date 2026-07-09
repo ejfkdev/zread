@@ -26,8 +26,8 @@ async def embed_texts(client: httpx.AsyncClient, texts: List[str]) -> List[List[
         return []
     out: List[List[float]] = []
     bs = settings.embed_batch_size
-    headers = {"Authorization": f"Bearer {settings.llm_api_key}"}
-    url = f"{settings.llm_base_url.rstrip('/')}/embeddings"
+    headers = {"Authorization": f"Bearer {settings.resolved_embed_api_key}"}
+    url = f"{settings.resolved_embed_base_url}/embeddings"
     for i in range(0, len(texts), bs):
         batch = texts[i : i + bs]
         resp = await client.post(

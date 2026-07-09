@@ -32,15 +32,30 @@ class Settings(BaseSettings):
     github_api_url: str = "https://api.github.com"
     github_raw_url: str = "https://raw.githubusercontent.com"
 
-    # --- OpenAI-compatible LLM / embeddings -----------------------------
+    # --- OpenAI-compatible LLM (chat completions) -----------------------
     # Any OpenAI-compatible endpoint: OpenAI, Azure, OpenRouter, Ollama, LiteLLM...
     llm_base_url: str = "https://api.openai.com/v1"
     llm_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
+    llm_timeout: float = 120.0
+
+    # --- Embeddings (separate provider allowed) -------------------------
+    # Defaults to the chat LLM endpoint so a single-provider setup works.
+    # Override when embeddings come from a different provider (e.g. chat via
+    # a local gateway, embeddings via OpenAI/Jina).
+    embed_base_url: str = ""  # "" = fall back to llm_base_url
+    embed_api_key: str = ""  # "" = fall back to llm_api_key
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
     embed_batch_size: int = 100
-    llm_timeout: float = 120.0
+
+    @property
+    def resolved_embed_base_url(self) -> str:
+        return (self.embed_base_url or self.llm_base_url).rstrip("/")
+
+    @property
+    def resolved_embed_api_key(self) -> str:
+        return self.embed_api_key or self.llm_api_key
 
     # --- Storage --------------------------------------------------------
     db_path: str = "data/zread-ai.db"

@@ -39,11 +39,13 @@ services:
       # network-exposed deployment; the client must send the same value via
       # ZREAD_AI_API_KEY. Leave empty only for local dev (API is then open).
       BACKEND_API_KEY: ${ZREAD_BACKEND_API_KEY:-}
-      # OpenAI-compatible LLM provider. See backend/.env.example for
-      # OpenAI / Azure / OpenRouter / Ollama / LiteLLM examples.
+      # OpenAI-compatible LLM (chat). See backend/.env.example for examples.
       ZREAD_LLM_BASE_URL: ${ZREAD_LLM_BASE_URL:-https://api.openai.com/v1}
       ZREAD_LLM_API_KEY: ${ZREAD_LLM_API_KEY:-}
       ZREAD_LLM_MODEL: ${ZREAD_LLM_MODEL:-gpt-4o-mini}
+      # Embeddings (optional separate provider; defaults to chat endpoint).
+      ZREAD_EMBED_BASE_URL: ${ZREAD_EMBED_BASE_URL:-}
+      ZREAD_EMBED_API_KEY: ${ZREAD_EMBED_API_KEY:-}
       ZREAD_EMBED_MODEL: ${ZREAD_EMBED_MODEL:-text-embedding-3-small}
       ZREAD_EMBED_DIM: ${ZREAD_EMBED_DIM:-1536}
     volumes:
