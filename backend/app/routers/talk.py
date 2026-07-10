@@ -22,7 +22,11 @@ from fastapi.responses import StreamingResponse
 from app.auth import require_api_key
 from app.db import get_db
 from app.models import MessageSend, TalkCreate, ok
-from app.rag import answer_stream, ensure_indexed
+from app.rag import (
+    TalkGoneError,
+    answer_stream,
+    ensure_indexed_with_progress,
+)
 
 router = APIRouter(tags=["talk"], dependencies=[Depends(require_api_key)])
 _log = logging.getLogger("zread_ai.talk_router")
@@ -48,15 +52,30 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
 
 
 async def _event_stream(
-    talk_id: str, query: str, model: str | None
+    talk_id: str, query: str, model: str | None, repo_id: str
 ) -> AsyncIterator[str]:
-    """Yield SSE events: progressive answer deltas, then round_finish, finish.
+    """Yield SSE events: (optional) index progress → answer deltas → finish.
 
-    On error yields event:error and terminates.
+    Indexing runs *inside* the stream so the HTTP response starts immediately
+    (the client is never blocked waiting for ``ensure_indexed``). Progress is
+    surfaced as ``event:status`` lines the client can show or ignore. On error
+    yields ``event:error`` and terminates.
     """
     full_text = ""
     full_reasoning = ""
     try:
+        # Ensure the repo is indexed before we retrieve+answer, emitting
+        # progress events while the stream is open (non-blocking for the HTTP
+        # response, which already started).
+        async for ev_name, ev_data in ensure_indexed_with_progress(repo_id):
+            if ev_data.get("status") == "error":
+                yield _sse(
+                    "error",
+                    {"text": f"indexing failed: {ev_data.get('error', '')}"},
+                )
+                return
+            yield _sse(ev_name, ev_data)
+
         async for delta_text, delta_reasoning in answer_stream(
             talk_id=talk_id, query=query, model=model
         ):
@@ -73,6 +92,11 @@ async def _event_stream(
             yield _sse("answer", {"reasoning_content": "", "text": ""})
         yield _sse("round_finish", {"reasoning_content": full_reasoning, "text": full_text})
         yield _sse("finish", {})
+    except TalkGoneError:
+        # The talk was deleted mid-stream (e.g. client timed out + cleaned up).
+        # Emit a clean terminal error instead of crashing/500.
+        _log.info("talk %s gone mid-stream", talk_id)
+        yield _sse("error", {"text": "talk closed"})
     except Exception as exc:
         _log.exception("talk %s failed", talk_id)
         yield _sse("error", {"text": str(exc)})
@@ -96,17 +120,17 @@ async def send_message(talk_id: str, body: MessageSend):
     )
     db.commit()
 
-    # If the repo isn't indexed yet, auto-index now (the first event will
-    # surface progress). This keeps the client path simple: just ask.
-    await ensure_indexed(repo_id)
-
+    # Indexing (if needed) happens *inside* the stream so the HTTP response
+    # starts immediately and progress is surfaced as event:status lines. This
+    # keeps the client path simple ("just ask") without blocking the request
+    # for minutes on a first question against an un-indexed repo.
     headers = {
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no",  # disable proxy buffering (nginx)
     }
     return StreamingResponse(
-        _event_stream(talk_id, body.query, model),
+        _event_stream(talk_id, body.query, model, repo_id),
         media_type="text/event-stream",
         headers=headers,
     )

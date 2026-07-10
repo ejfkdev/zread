@@ -20,32 +20,42 @@ _MAX_RETRIES = 4
 # Status codes treated as transient (retryable). 502/503/429 are all gateway
 # overload or rate-limit signals — safe to back off and retry.
 _RETRYABLE = {429, 502, 503}
-# Small pacing delay between successful batches so we don't slam a gateway
-# that fans out one upstream call per input (e.g. freellmapi → Google free-tier).
-_BATCH_PACE_S = 0.5
 
 
 async def embed_texts(client: httpx.AsyncClient, texts: List[str]) -> List[List[float]]:
     """Embed a list of texts, batching to respect provider limits.
 
-    Returns one vector per input text, in order. Retries on 429/503 with
-    exponential backoff (transient upstream provider exhaustion). Raises on
-    persistent provider error.
+    Returns one vector per input text, in order. Batches are embedded
+    concurrently up to ``settings.embed_concurrency`` at a time, with an
+    optional ``settings.embed_pace_s`` delay between dispatches. Retries on
+    429/502/503 with exponential backoff (transient upstream provider
+    exhaustion). Raises on persistent provider error.
     """
     if not texts:
         return []
-    out: List[List[float]] = []
     bs = settings.embed_batch_size
     headers = {"Authorization": f"Bearer {settings.resolved_embed_api_key}"}
     url = f"{settings.resolved_embed_base_url}/embeddings"
-    for i in range(0, len(texts), bs):
-        batch = texts[i : i + bs]
-        vectors = await _embed_batch_with_retry(client, url, headers, batch)
-        out.extend(vectors)
-        # Pace between batches to avoid overwhelming a gateway that fans out
-        # one upstream call per input (rate-limited free-tier providers).
-        if i + bs < len(texts):
-            await asyncio.sleep(_BATCH_PACE_S)
+
+    # Slice into batches; embed concurrently (bounded) while preserving order.
+    batches = [texts[i : i + bs] for i in range(0, len(texts), bs)]
+    semaphore = asyncio.Semaphore(max(1, settings.embed_concurrency))
+    pace = max(0.0, settings.embed_pace_s)
+
+    async def _embed_indexed(idx: int, batch: List[str]) -> List[List[float]]:
+        async with semaphore:
+            if pace and idx > 0:
+                # Stagger dispatches so concurrent batches don't all hit the
+                # gateway in the same instant.
+                await asyncio.sleep(pace * (idx % max(1, settings.embed_concurrency)))
+            return await _embed_batch_with_retry(client, url, headers, batch)
+
+    results = await asyncio.gather(
+        *(_embed_indexed(i, b) for i, b in enumerate(batches))
+    )
+    out: List[List[float]] = []
+    for vecs in results:
+        out.extend(vecs)
     return out
 
 

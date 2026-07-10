@@ -92,8 +92,17 @@ The idempotency key is the `repo_id` string (`owner/repo@ref`).
 
 Re-indexing happens when:
 1. A user explicitly calls `POST /api/v1/repos/{owner}/{name}/index`.
-2. The first question on an un-indexed repo auto-triggers indexing
-   (`ensure_indexed` in the talk path).
+2. The first question on an un-indexed repo auto-triggers indexing inside
+   the SSE stream (`ensure_indexed_with_progress` in the talk path). The
+   HTTP response starts immediately and emits `event:status` progress
+   events (`indexing` → `success`/`error`) while indexing runs, so the
+   client is never blocked waiting for the index to finish. A per-repo lock
+   ensures two concurrent first-questions on the same repo index it once.
+
+If the talk is deleted mid-stream (e.g. the client timed out and cleaned up),
+the stream emits a terminal `event:error {"text":"talk closed"}` instead of
+crashing — the RAG layer raises `TalkGoneError`, which the router converts to
+a clean SSE event.
 
 **Out of scope:** automatic re-index on Git push (webhooks). For MVP, a manual
 re-index call or the first-question flow is sufficient. A future enhancement
@@ -197,9 +206,9 @@ backend/
 │   ├── indexer.py          # full pipeline: fetch → chunk → embed → store
 │   ├── retriever.py        # vector KNN retrieval via sqlite-vec
 │   ├── llm.py              # streaming chat + delta normalization
-│   ├── rag.py              # orchestration: ensure_indexed → retrieve → stream
+│   ├── rag.py              # orchestration: ensure_indexed_with_progress → retrieve → stream
 │   └── routers/
 │       ├── index.py        # POST .../index, GET .../status
 │       └── talk.py         # POST /talk, POST /talk/{id}/message (SSE), DEL
-└── tests/                  # 30 tests: chunker, retriever, talk, github, llm
+└── tests/                  # 57 tests: chunker, retriever, talk, github, llm, retry
 ```

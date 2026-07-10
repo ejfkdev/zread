@@ -131,3 +131,42 @@ Phase 0 items 1–2 first (bug fixes land cleanly before the split, or fold H/M 
 ---
 
 *Full details, line references and reproduction notes are in section 1; each High/Medium item is sized as an independent, testable PR.*
+
+---
+
+## 4. AI backend — known issues resolved (`feat/ai-qa-backend`)
+
+These fixes target the `backend/` FastAPI service, not the CLI reviewed above.
+
+**A1. `ask` timed out on the first question against an un-indexed repo.**
+`talk.send_message` awaited `ensure_indexed(repo_id)` *before* returning the
+`StreamingResponse`, so the HTTP request blocked for minutes on a large repo
+(18k chunks → ~3 min) and the MCP client / harness timed out long before any
+byte was sent. **Fix:** indexing now runs *inside* the SSE generator
+(`ensure_indexed_with_progress`), so the response starts immediately and emits
+`event:status` progress (`indexing` → `success`/`error`) while the index
+builds. The client path stays "just ask".
+
+**A2. `talk not found` race after a client timeout (consequence of A1).**
+When the client timed out at ~30s and cancelled, its cleanup deleted the talk
+row while the backend was still blocked in `ensure_indexed`; the subsequent
+`answer_stream` lookup hit a deleted row and raised `ValueError` (a 500-grade
+crash). **Fix:** the RAG layer now raises `TalkGoneError`, which the router
+converts into a clean terminal `event:error {"text":"talk closed"}` instead of
+a traceback.
+
+**A3. Concurrent first-questions double-indexed the same repo.**
+`ensure_indexed` had no lock, so two simultaneous first-questions both ran a
+full index. **Fix:** a per-`repo_id` `asyncio.Lock` serializes concurrent
+callers; the second one re-checks the status after acquiring the lock and
+skips if the first already finished.
+
+**A4. Embedding was strictly sequential with a hardcoded 0.5s pacing delay.**
+This made first-index of large repos unnecessarily slow even on a fast LAN
+Ollama. **Fix:** batches now embed concurrently up to `ZREAD_EMBED_CONCURRENCY`
+(default 4), and the inter-batch delay is configurable via
+`ZREAD_EMBED_PACE_S` (default 0.5; set 0 for a local provider).
+
+Tests added in `backend/tests/test_talk_router.py`: non-blocking index with
+progress events, index-failure → `event:error`, talk-deleted-mid-stream →
+clean error, and concurrent-first-question indexes once.

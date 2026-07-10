@@ -60,6 +60,14 @@ class Settings(BaseSettings):
     embed_model: str = "text-embedding-3-small"
     embed_dim: int = 1536
     embed_batch_size: int = 100
+    # Inter-batch delay (seconds). A free-tier embedding gateway may fan out
+    # one upstream call per input and rate-limit aggressively; a local Ollama
+    # on a LAN can safely set this to 0.
+    embed_pace_s: float = 0.5
+    # Max concurrent embedding batches. 1 = strictly sequential (the old
+    # behaviour); raise it to parallelize round-trips against a provider that
+    # can handle the load.
+    embed_concurrency: int = 4
 
     @property
     def resolved_embed_base_url(self) -> str:
